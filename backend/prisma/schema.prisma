@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MECHANIC
+  RECEPTIONIST
+}
+
+enum RepairOrderStatus {
+  NEW
+  WAITING
+  DIAGNOSING
+  REPAIRING
+  READY
+  COMPLETED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         Role     @default(MECHANIC)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Customer {
+  id           String        @id @default(uuid())
+  fullName     String
+  companyName  String?
+  phone        String?
+  email        String?
+  address      String?
+  nip          String?       @unique
+  notes        String?
+  vehicles     Vehicle[]
+  repairOrders RepairOrder[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([phone])
+  @@index([email])
+}
+
+model Vehicle {
+  id               String        @id @default(uuid())
+  customerId       String
+  customer         Customer      @relation(fields: [customerId], references: [id])
+  vin              String?
+  licensePlate     String?
+  make             String?
+  model            String?
+  generation       String?
+  productionYear   Int?
+  engine           String?
+  engineCode       String?
+  horsepower       Int?
+  fuelType         String?
+  transmission     String?
+  driveType        String?
+  bodyType         String?
+  color            String?
+  mileage          Int?
+  registrationDate DateTime?
+  notes            String?
+  repairOrders     RepairOrder[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([vin])
+  @@index([licensePlate])
+}
+
+model RepairOrder {
+  id                 String            @id @default(uuid())
+  customerId         String
+  customer           Customer          @relation(fields: [customerId], references: [id])
+  vehicleId          String
+  vehicle            Vehicle           @relation(fields: [vehicleId], references: [id])
+  assignedMechanicId String?
+  status             RepairOrderStatus @default(NEW)
+  reportedIssue      String
+  diagnosis          String?
+  mechanicNotes      String?
+  estimatedCost      Float?
+  finalCost          Float?
+  laborCost          Float?
+  marginPercentage   Float?
+  parts              RepairOrderPart[]
+  invoiceId          String?
+  invoiceUrl         String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  completedAt        DateTime?
+
+  @@index([status])
+}
+
+model RepairOrderPart {
+  id              String       @id @default(uuid())
+  repairOrderId   String
+  repairOrder     RepairOrder  @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  partId          String
+  part            Part         @relation(fields: [partId], references: [id])
+  quantity        Int          @default(1)
+  priceAtUsage    Float
+  createdAt       DateTime     @default(now())
+
+  @@unique([repairOrderId, partId])
+}
+
+model Part {
+  id                String   @id @default(uuid())
+  name              String
+  oemNumber         String?
+  aftermarketNumber String?
+  manufacturer      String?
+  supplier          String?
+  unitPrice         Float
+  quantity          Int      @default(0)
+  repairOrders      RepairOrderPart[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([oemNumber])
+  @@index([aftermarketNumber])
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  fileName   String
+  mimeType   String
+  url        String
+  size       Int
+  createdAt  DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}

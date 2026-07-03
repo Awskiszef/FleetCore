@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build files
+dist/
+build/
+.next/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Project Docs
+AI/
+
+# Backend specific
+backend/uploads/
+backend/dist/
+backend/node_modules/
+baza_atlashc.sql
+
+# Logs
+logs/
+*.log
+
+# Prisma
+# Nie ignorujemy folderu prisma/, ale można ignorować wygenerowanego klienta jeśli używamy custom paths (domyślnie jest w node_modules)
