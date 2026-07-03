@@ -18,32 +18,7 @@ export class CustomersController {
 
   @Get('fetch-nip/:nip')
   async fetchNip(@Param('nip') nip: string) {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const url = `https://wl-api.mf.gov.pl/api/search/nip/${nip}?date=${today}`;
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new HttpException('Błąd podczas pobierania danych z API MF.', HttpStatus.BAD_REQUEST);
-      }
-      
-      const data = await response.json();
-      if (!data?.result?.subject) {
-        throw new HttpException('Nie znaleziono firmy o podanym NIP w bazie MF.', HttpStatus.NOT_FOUND);
-      }
-      
-      const subject = data.result.subject;
-      
-      return {
-        name: subject.name,
-        address: subject.workingAddress || subject.residenceAddress || '',
-      };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException('Błąd wewnętrzny serwera przy odpytywaniu GUS/MF.', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    return this.customersService.fetchNip(nip);
   }
 
   @Get(':id')
