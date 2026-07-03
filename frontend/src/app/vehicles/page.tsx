@@ -40,7 +40,11 @@ export default function VehiclesPage() {
     licensePlate: "",
     vin: "",
     customerId: "",
-    registrationCountry: "PL"
+    registrationCountry: "PL",
+    productionYear: "",
+    engine: "",
+    horsepower: "",
+    fuelType: ""
   });
 
   const fetchVehicles = async () => {
@@ -104,7 +108,7 @@ export default function VehiclesPage() {
       });
       if (response.ok) {
         setIsDialogOpen(false);
-        setFormData({ make: "", model: "", licensePlate: "", vin: "", customerId: "", registrationCountry: "PL" });
+        setFormData({ make: "", model: "", licensePlate: "", vin: "", customerId: "", registrationCountry: "PL", productionYear: "", engine: "", horsepower: "", fuelType: "" });
         await fetchVehicles();
         toast.success("Pojazd został pomyślnie dodany.");
       } else {
