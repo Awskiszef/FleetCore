@@ -1,0 +1,55 @@
+# /docker-compose.yml
+version: "3.8"
+
+services:
+  # Baza danych PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: fleetcore_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: SecretPassword123!
+      POSTGRES_DB: fleetcore
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Backend (API w NestJS)
+  backend:
+    build: ./backend
+    container_name: fleetcore_backend
+    environment:
+      - DATABASE_URL=postgresql://admin:SecretPassword123!@db:5432/fleetcore?schema=public
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # Frontend (Interfejs w Next.js)
+  frontend:
+    build: ./frontend
+    container_name: fleetcore_frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.atlashc.pl
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Menedżer domen i certyfikatów SSL
+  nginx-proxy-manager:
+    image: "jc21/nginx-proxy-manager:latest"
+    container_name: nginx_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - ./nginx/data:/data
+      - ./nginx/letsencrypt:/etc/letsencrypt
+
+volumes:
+  pgdata:
