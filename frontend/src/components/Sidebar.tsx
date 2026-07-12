@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Car, Wrench, Package, Settings, Receipt } from "lucide-react";
+import { LayoutDashboard, Users, Car, Wrench, Package, Settings, Receipt, CarFront } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -13,6 +13,7 @@ export function Sidebar() {
     { href: "/invoices", label: "Faktury", icon: Receipt },
     { href: "/customers", label: "Klienci", icon: Users },
     { href: "/vehicles", label: "Pojazdy", icon: Car },
+    { href: "/fleet", label: "Moje Auta", icon: CarFront },
     { href: "/inventory", label: "Magazyn", icon: Package },
     { href: "/settings", label: "Ustawienia", icon: Settings },
   ];

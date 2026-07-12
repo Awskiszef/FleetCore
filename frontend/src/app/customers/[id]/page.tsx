@@ -65,7 +65,7 @@ export default function CustomerProfilePage() {
   useEffect(() => {
     const fetchCustomer = async () => {
       try {
-        const res = await fetch(`http://localhost:3001/customers/${params.id}`);
+        const res = await fetch(`http://${window.location.hostname}:3001/customers/${params.id}`);
         if (res.ok) {
           const data = await res.json();
           setCustomer(data);
@@ -92,7 +92,7 @@ export default function CustomerProfilePage() {
     }
     setIsAddingVehicle(true);
     try {
-      const res = await fetch("http://localhost:3001/vehicles", {
+      const res = await fetch(`http://${window.location.hostname}:3001/vehicles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -114,7 +114,7 @@ export default function CustomerProfilePage() {
         setVehicleForm({ make: "", model: "", licensePlate: "", vin: "", productionYear: "", engine: "", fuelType: "", horsepower: "", registrationCountry: "PL" });
         toast.success("Pojazd został przypisany do klienta!");
         // Refresh customer to get the new vehicle
-        const refreshRes = await fetch(`http://localhost:3001/customers/${params.id}`);
+        const refreshRes = await fetch(`http://${window.location.hostname}:3001/customers/${params.id}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setCustomer(data);
@@ -136,7 +136,7 @@ export default function CustomerProfilePage() {
     }
     setIsDecodingVIN(true);
     try {
-      const res = await fetch(`http://localhost:3001/vehicles/decode-vin/${vehicleForm.vin}`);
+      const res = await fetch(`http://${window.location.hostname}:3001/vehicles/decode-vin/${vehicleForm.vin}`);
       
       if (res.ok) {
         const data = await res.json();
@@ -187,7 +187,7 @@ export default function CustomerProfilePage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:3001/customers/${params.id}`, {
+      const res = await fetch(`http://${window.location.hostname}:3001/customers/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editForm),
@@ -210,7 +210,7 @@ export default function CustomerProfilePage() {
   const handleDeleteCustomer = async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`http://localhost:3001/customers/${params.id}`, {
+      const res = await fetch(`http://${window.location.hostname}:3001/customers/${params.id}`, {
         method: "DELETE",
       });
       if (res.ok) {

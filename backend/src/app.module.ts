@@ -12,6 +12,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
+import { FleetModule } from './fleet/fleet.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { SettingsModule } from './settings/settings.module';
     AttachmentsModule,
     DashboardModule,
     NotificationsModule,
-    SettingsModule
+    SettingsModule,
+    FleetModule
   ],
   controllers: [AppController],
   providers: [AppService],

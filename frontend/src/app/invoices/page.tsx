@@ -19,7 +19,7 @@ export default function InvoicesPage() {
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1; // 1-12
-      const res = await fetch(`http://localhost:3001/repair-orders/invoices/list?year=${year}&month=${month}`);
+      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/invoices/list?year=${year}&month=${month}`);
       if (res.ok) {
         const data = await res.json();
         setInvoices(data);
@@ -139,7 +139,7 @@ export default function InvoicesPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <a 
-                          href={`http://localhost:3001/repair-orders/${order.id}/invoice-pdf`} 
+                          href={`http://${window.location.hostname}:3001/repair-orders/${order.id}/invoice-pdf`} 
                           target="_blank" 
                           rel="noreferrer" 
                           className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full px-3 py-1.5 inline-flex items-center justify-center text-xs font-medium transition-colors border border-zinc-700"

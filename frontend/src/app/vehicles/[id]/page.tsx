@@ -65,7 +65,7 @@ export default function VehicleProfilePage() {
   useEffect(() => {
     const fetchVehicle = async () => {
       try {
-        const res = await fetch(`http://localhost:3001/vehicles/${params.id}`);
+        const res = await fetch(`http://${window.location.hostname}:3001/vehicles/${params.id}`);
         if (res.ok) {
           const data = await res.json();
           setVehicle(data);
@@ -81,7 +81,7 @@ export default function VehicleProfilePage() {
     };
     const fetchAttachments = async () => {
       try {
-        const res = await fetch(`http://localhost:3001/attachments/entity/VEHICLE/${params.id}`);
+        const res = await fetch(`http://${window.location.hostname}:3001/attachments/entity/VEHICLE/${params.id}`);
         if (res.ok) {
           const data = await res.json();
           setAttachments(data);
@@ -139,7 +139,7 @@ export default function VehicleProfilePage() {
     }
     setIsAddingOrder(true);
     try {
-      const res = await fetch("http://localhost:3001/repair-orders", {
+      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -154,7 +154,7 @@ export default function VehicleProfilePage() {
         setOrderForm({ reportedIssue: "", estimatedCost: "" });
         toast.success("Nowe zlecenie naprawy zostało utworzone!");
         // Refresh vehicle to get the new order
-        const refreshRes = await fetch(`http://localhost:3001/vehicles/${params.id}`);
+        const refreshRes = await fetch(`http://${window.location.hostname}:3001/vehicles/${params.id}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setVehicle(data);
@@ -189,7 +189,7 @@ export default function VehicleProfilePage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:3001/vehicles/${params.id}`, {
+      const res = await fetch(`http://${window.location.hostname}:3001/vehicles/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -216,7 +216,7 @@ export default function VehicleProfilePage() {
   const handleDeleteVehicle = async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`http://localhost:3001/vehicles/${params.id}`, {
+      const res = await fetch(`http://${window.location.hostname}:3001/vehicles/${params.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -547,7 +547,7 @@ export default function VehicleProfilePage() {
             {attachments.length > 0 ? (
               attachments.map((att, idx) => (
                 <div key={idx} className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900/50 hover:border-purple-500/50 transition-colors">
-                  <img src={`http://localhost:3001${att.url}`} alt={att.fileName} className="w-full h-full object-cover" />
+                  <img src={`http://${window.location.hostname}:3001${att.url}`} alt={att.fileName} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
                     <span className="text-[10px] text-zinc-300 truncate">{att.fileName}</span>
                   </div>

@@ -33,13 +33,12 @@ export default function SettingsPage() {
     twilioAuthToken: "",
     twilioPhoneNumber: "",
     resendApiKey: "",
-    ceidgApiKey: "",
   });
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch("http://localhost:3001/settings");
+        const response = await fetch(`http://${window.location.hostname}:3001/settings`);
         if (response.ok) {
           const data = await response.json();
           setCompanyData({
@@ -60,7 +59,6 @@ export default function SettingsPage() {
             twilioAuthToken: data.twilioAuthToken || "",
             twilioPhoneNumber: data.twilioPhoneNumber || "",
             resendApiKey: data.resendApiKey || "",
-            ceidgApiKey: data.ceidgApiKey || "",
           });
         }
       } catch (e) {
@@ -75,7 +73,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch("http://localhost:3001/settings", {
+      const response = await fetch(`http://${window.location.hostname}:3001/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -94,7 +92,6 @@ export default function SettingsPage() {
           twilioAuthToken: apiKeys.twilioAuthToken,
           twilioPhoneNumber: apiKeys.twilioPhoneNumber,
           resendApiKey: apiKeys.resendApiKey,
-          ceidgApiKey: apiKeys.ceidgApiKey,
         })
       });
 
@@ -411,31 +408,6 @@ export default function SettingsPage() {
                         value={apiKeys.resendApiKey} 
                         onChange={e => setApiKeys({...apiKeys, resendApiKey: e.target.value})} 
                         className="bg-zinc-950 border-zinc-800 text-zinc-400 focus-visible:ring-purple-500 font-mono" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* CEIDG */}
-                <div className="p-5 rounded-xl bg-zinc-900/50 border border-zinc-800 flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-orange-500/20 p-2 rounded-lg text-orange-400"><Database className="w-5 h-5" /></div>
-                      <div>
-                        <h3 className="font-bold text-zinc-200">CEIDG (Biznes.gov.pl)</h3>
-                        <p className="text-xs text-zinc-500">Pobieranie szczegółowego adresu (dla JDG) na podstawie NIP.</p>
-                      </div>
-                    </div>
-                    <div className="px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full text-xs font-medium">Opcjonalnie</div>
-                  </div>
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label className="text-zinc-400 text-xs uppercase tracking-wider">API Key (Bearer Token)</Label>
-                      <Input 
-                        type="password" 
-                        value={apiKeys.ceidgApiKey} 
-                        onChange={e => setApiKeys({...apiKeys, ceidgApiKey: e.target.value})} 
-                        className="bg-zinc-950 border-zinc-800 text-zinc-400 focus-visible:ring-orange-500 font-mono" 
                       />
                     </div>
                   </div>

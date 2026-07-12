@@ -49,7 +49,7 @@ export default function VehiclesPage() {
 
   const fetchVehicles = async () => {
     try {
-      const response = await fetch("http://localhost:3001/vehicles");
+      const response = await fetch(`http://${window.location.hostname}:3001/vehicles`);
       if (response.ok) {
         const data = await response.json();
         setVehicles(data);
@@ -66,7 +66,7 @@ export default function VehiclesPage() {
 
   const fetchCustomersForDropdown = async () => {
     try {
-      const response = await fetch("http://localhost:3001/customers");
+      const response = await fetch(`http://${window.location.hostname}:3001/customers`);
       if (response.ok) {
         const data = await response.json();
         setCustomersList(data.map((c: any) => ({ id: c.id, fullName: c.fullName })));
@@ -89,7 +89,7 @@ export default function VehiclesPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const response = await fetch("http://localhost:3001/vehicles", {
+      const response = await fetch(`http://${window.location.hostname}:3001/vehicles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -128,7 +128,7 @@ export default function VehiclesPage() {
     }
     setIsDecodingVIN(true);
     try {
-      const res = await fetch(`http://localhost:3001/vehicles/decode-vin/${formData.vin}`);
+      const res = await fetch(`http://${window.location.hostname}:3001/vehicles/decode-vin/${formData.vin}`);
       
       if (res.ok) {
         const data = await res.json();

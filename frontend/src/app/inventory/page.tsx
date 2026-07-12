@@ -40,7 +40,7 @@ export default function InventoryPage() {
 
   const fetchParts = async () => {
     try {
-      const res = await fetch("http://localhost:3001/parts");
+      const res = await fetch(`http://${window.location.hostname}:3001/parts`);
       if (res.ok) {
         const data = await res.json();
         setParts(data);
@@ -65,7 +65,7 @@ export default function InventoryPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("http://localhost:3001/parts", {
+      const res = await fetch(`http://${window.location.hostname}:3001/parts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,7 +101,7 @@ export default function InventoryPage() {
     if (!window.confirm("Czy na pewno chcesz usunąć tę część z systemu?")) return;
     
     try {
-      const res = await fetch(`http://localhost:3001/parts/${id}`, { method: "DELETE" });
+      const res = await fetch(`http://${window.location.hostname}:3001/parts/${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Część została usunięta.");
         setParts(parts.filter(p => p.id !== id));
@@ -121,7 +121,7 @@ export default function InventoryPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:3001/parts/${id}`, {
+      const res = await fetch(`http://${window.location.hostname}:3001/parts/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quantity: newQuantity })

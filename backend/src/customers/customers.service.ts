@@ -86,45 +86,6 @@ export class CustomersService {
         } catch (e) {
           console.error("Błąd podczas pobierania z KRS:", e);
         }
-      } else {
-        // Sprawdzenie CEIDG (Ministerstwo Rozwoju) dla JDG
-        const ceidgSetting = await this.prisma.setting.findUnique({ where: { key: 'ceidgApiKey' } });
-        const ceidgKey = ceidgSetting?.value || process.env.CEIDG_API_KEY;
-        
-        if (ceidgKey) {
-          try {
-            const ceidgUrl = `https://dane.biznes.gov.pl/api/ceidg/v2/firmy?nip=${nip}`;
-            const ceidgResponse = await fetch(ceidgUrl, {
-              headers: {
-                'Authorization': `Bearer ${ceidgKey}`
-              }
-            });
-            
-            if (ceidgResponse.ok) {
-              const ceidgData = await ceidgResponse.json();
-              if (ceidgData?.firmy && ceidgData.firmy.length > 0) {
-                const firma = ceidgData.firmy[0];
-                const adr = firma.adresDzialalnosci;
-                if (adr) {
-                  const street = adr.ulica ? `ul. ${adr.ulica}` : '';
-                  const house = adr.budynek || '';
-                  const local = adr.lokal ? `/${adr.lokal}` : '';
-                  const city = adr.miasto || '';
-                  const postal = adr.kod || '';
-                  
-                  const fullStreet = [street, house + local].filter(Boolean).join(' ').trim();
-                  const fullCity = [postal, city].filter(Boolean).join(' ').trim();
-                  
-                  if (fullStreet || fullCity) {
-                    address = `${fullStreet}, ${fullCity}`.replace(/^, /, '').trim();
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            console.error("Błąd podczas pobierania z CEIDG:", e);
-          }
-        }
       }
       
       return {
