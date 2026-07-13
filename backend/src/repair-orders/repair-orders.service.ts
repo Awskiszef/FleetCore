@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, RepairOrderStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { createPaginatedResponse } from '../common/pagination/paginated-response';
 
 @Injectable()
 export class RepairOrdersService {
@@ -36,6 +37,18 @@ export class RepairOrdersService {
     const page = query?.page || 1;
     const limit = query?.limit || 20;
     const skip = (page - 1) * limit;
+
+    const allowedSortFields = [
+      'createdAt',
+      'status',
+      'estimatedCost',
+      'finalCost',
+    ];
+    if (query?.sortBy && !allowedSortFields.includes(query.sortBy)) {
+      throw new BadRequestException(
+        `Niedozwolone pole sortowania: ${query.sortBy}. Dozwolone: ${allowedSortFields.join(', ')}`,
+      );
+    }
 
     const where: Prisma.RepairOrderWhereInput = {};
     if (query?.search) {
@@ -70,7 +83,7 @@ export class RepairOrdersService {
       this.prisma.repairOrder.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return createPaginatedResponse(data, total, page, limit);
   }
 
   async findOne(id: string) {

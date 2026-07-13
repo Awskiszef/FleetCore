@@ -11,6 +11,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { apiClient } from "@/lib/api-client";
+
 interface Vehicle {
   id: string;
   make: string;
@@ -30,8 +34,14 @@ export default function VehiclesPage() {
   const canAddVehicle = user?.role === 'ADMIN' || user?.role === 'OWNER';
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   
   // Add Vehicle Form State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -53,13 +63,11 @@ export default function VehiclesPage() {
 
   const fetchVehicles = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/vehicles`);
-      if (response.ok) {
-        const data = await response.json();
-        setVehicles(data);
-      } else {
-        throw new Error("Failed to fetch vehicles");
-      }
+      const page = Number(searchParams.get("page")) || 1;
+      const search = searchParams.get("search") || "";
+      const result = await apiClient.getVehicles({ page, limit: 20, search });
+      setVehicles(result.data);
+      setPagination({ page: result.page, limit: result.limit, totalPages: result.totalPages });
     } catch (error) {
       toast.error("Nie udało się pobrać listy pojazdów z serwera.");
       setVehicles([]);
@@ -70,11 +78,8 @@ export default function VehiclesPage() {
 
   const fetchCustomersForDropdown = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers`);
-      if (response.ok) {
-        const data = await response.json();
-        setCustomersList(data.map((c: any) => ({ id: c.id, fullName: c.fullName })));
-      }
+      const result = await apiClient.getCustomers({ limit: 100 });
+      setCustomersList(result.data.map((c: any) => ({ id: c.id, fullName: c.fullName })));
     } catch (error) {
       console.error("Failed to fetch customers list");
     }
@@ -82,7 +87,25 @@ export default function VehiclesPage() {
 
   useEffect(() => {
     fetchVehicles();
-  }, []);
+  }, [searchParams]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    const params = new URLSearchParams(searchParams);
+    if (val) {
+      params.set("search", val);
+    } else {
+      params.delete("search");
+    }
+    params.set("page", "1");
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage.toString());
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   const openAddDialog = () => {
     fetchCustomersForDropdown();
@@ -164,14 +187,6 @@ export default function VehiclesPage() {
       setIsDecodingVIN(false);
     }
   };
-
-  const filteredVehicles = vehicles.filter(
-    (v) =>
-      v.licensePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.vin.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -277,7 +292,7 @@ export default function VehiclesPage() {
             placeholder="Szukaj po marce, modelu lub rejestracji..." 
             className="pl-10 w-full bg-zinc-900/50 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-500 rounded-xl px-3 py-2"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
 
@@ -299,14 +314,14 @@ export default function VehiclesPage() {
                     Ładowanie danych...
                   </td>
                 </tr>
-              ) : filteredVehicles.length === 0 ? (
+              ) : vehicles.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-zinc-500">
                     Nie znaleziono pojazdów.
                   </td>
                 </tr>
               ) : (
-                filteredVehicles.map((vehicle) => (
+                vehicles.map((vehicle) => (
                   <tr 
                     key={vehicle.id} 
                     className="group hover:bg-zinc-800/30 transition-colors duration-200 cursor-pointer"
@@ -347,6 +362,11 @@ export default function VehiclesPage() {
             </tbody>
           </table>
         </div>
+        <PaginationControls 
+          page={pagination.page} 
+          totalPages={pagination.totalPages} 
+          onPageChange={handlePageChange} 
+        />
       </GlassCard>
     </div>
   );

@@ -11,7 +11,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
-
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { apiClient } from "@/lib/api-client";
 interface RepairOrder {
   id: string;
   status: string;
@@ -40,8 +42,14 @@ export default function RepairOrdersPage() {
   const canCreateOrder = user?.role === 'ADMIN' || user?.role === 'OWNER' || user?.role === 'RECEPTIONIST';
 
   const [orders, setOrders] = useState<RepairOrder[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
 
   // Add Order Form State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -59,13 +67,11 @@ export default function RepairOrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders`);
-      if (response.ok) {
-        const data = await response.json();
-        setOrders(data);
-      } else {
-        throw new Error("Failed to fetch");
-      }
+      const page = Number(searchParams.get("page")) || 1;
+      const search = searchParams.get("search") || "";
+      const result = await apiClient.getRepairOrders({ page, limit: 20, search });
+      setOrders(result.data);
+      setPagination({ page: result.page, limit: result.limit, totalPages: result.totalPages });
     } catch (error) {
       setOrders([]);
     } finally {
@@ -76,15 +82,11 @@ export default function RepairOrdersPage() {
   const fetchDropdownData = async () => {
     try {
       const [cRes, vRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/vehicles`)
+        apiClient.getCustomers({ limit: 100 }),
+        apiClient.getVehicles({ limit: 100 })
       ]);
-      if (cRes.ok && vRes.ok) {
-        const customers = await cRes.json();
-        const vehicles = await vRes.json();
-        setCustomersList(customers);
-        setVehiclesList(vehicles);
-      }
+      setCustomersList(cRes.data);
+      setVehiclesList(vRes.data);
     } catch (error) {
       console.error("Failed to fetch dropdown data");
     }
@@ -92,7 +94,25 @@ export default function RepairOrdersPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [searchParams]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    const params = new URLSearchParams(searchParams);
+    if (val) {
+      params.set("search", val);
+    } else {
+      params.delete("search");
+    }
+    params.set("page", "1");
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage.toString());
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   // Update available vehicles when customer changes
   useEffect(() => {
@@ -147,13 +167,6 @@ export default function RepairOrdersPage() {
     }
   };
 
-  const filteredOrders = orders.filter(
-    (o) =>
-      o.reportedIssue.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (o.vehicle && o.vehicle.licensePlate.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
       
@@ -161,9 +174,9 @@ export default function RepairOrdersPage() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-600">
-            Zlecenia Napraw
+            Zlecenia
           </h1>
-          <p className="text-zinc-400 mt-2 text-lg">Zarządzaj przepływem pracy w warsztacie.</p>
+          <p className="text-zinc-400 mt-2 text-lg">Zarządzaj i śledź statusy napraw pojazdów.</p>
         </div>
         
         {canCreateOrder && (
@@ -174,19 +187,19 @@ export default function RepairOrdersPage() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle className="text-xl text-emerald-400">Utwórz zlecenie naprawy</DialogTitle>
+              <DialogTitle className="text-xl text-emerald-400">Utwórz Zlecenie</DialogTitle>
               <DialogDescription className="text-zinc-400">
-                Wybierz klienta oraz pojazd i opisz zgłaszany problem.
+                Otwórz nowe zlecenie serwisowe dla pojazdu klienta.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="customerId" className="text-zinc-300">Właściciel <span className="text-red-500">*</span></Label>
+                <Label htmlFor="customerId" className="text-zinc-300">Klient <span className="text-red-500">*</span></Label>
                 <select 
                   id="customerId" 
                   value={formData.customerId}
-                  onChange={e => setFormData({...formData, customerId: e.target.value})}
-                  className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100"
+                  onChange={e => setFormData({...formData, customerId: e.target.value, vehicleId: ""})}
+                  className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100"
                 >
                   <option value="">-- Wybierz klienta --</option>
                   {customersList.map(c => (
@@ -200,35 +213,35 @@ export default function RepairOrdersPage() {
                   id="vehicleId" 
                   value={formData.vehicleId}
                   onChange={e => setFormData({...formData, vehicleId: e.target.value})}
-                  disabled={!formData.customerId && filteredVehicles.length === 0}
-                  className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100"
+                  disabled={!formData.customerId}
+                  className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100 disabled:opacity-50"
                 >
                   <option value="">-- Wybierz pojazd --</option>
-                  {filteredVehicles.map((v: any) => (
+                  {filteredVehicles.map(v => (
                     <option key={v.id} value={v.id}>{v.make} {v.model} ({v.licensePlate})</option>
                   ))}
                 </select>
-                {!formData.customerId && <span className="text-xs text-zinc-500">Najpierw wybierz klienta, by zawęzić listę.</span>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="reportedIssue" className="text-zinc-300">Zgłaszany problem / Usterka <span className="text-red-500">*</span></Label>
+                <Label htmlFor="reportedIssue" className="text-zinc-300">Zgłaszana usterka / Opis</Label>
                 <textarea 
                   id="reportedIssue" 
-                  value={formData.reportedIssue} 
-                  onChange={e => setFormData({...formData, reportedIssue: e.target.value})} 
-                  className="flex w-full rounded-md px-3 py-2 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-zinc-900 border border-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 min-h-[100px] text-zinc-100 placeholder:text-zinc-500" 
-                  placeholder="Opisz problem zgłaszany przez klienta..."
+                  rows={3}
+                  value={formData.reportedIssue}
+                  onChange={e => setFormData({...formData, reportedIssue: e.target.value})}
+                  className="flex w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100 resize-none"
+                  placeholder="Krótki opis problemu zgłaszanego przez klienta..."
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="estimatedCost" className="text-zinc-300">Szacowany koszt (PLN, opcjonalnie)</Label>
+                <Label htmlFor="estimatedCost" className="text-zinc-300">Szacunkowy koszt (PLN)</Label>
                 <Input 
                   id="estimatedCost" 
                   type="number"
-                  value={formData.estimatedCost} 
-                  onChange={e => setFormData({...formData, estimatedCost: e.target.value})} 
+                  value={formData.estimatedCost}
+                  onChange={e => setFormData({...formData, estimatedCost: e.target.value})}
                   className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" 
-                  placeholder="np. 500"
+                  placeholder="Np. 500"
                 />
               </div>
             </div>
@@ -237,7 +250,7 @@ export default function RepairOrdersPage() {
                 Anuluj
               </DialogClose>
               <Button type="submit" disabled={isSubmitting} onClick={handleAddOrder} className="bg-emerald-600 hover:bg-emerald-500 text-white border-0">
-                {isSubmitting ? "Zapisywanie..." : "Utwórz Zlecenie"}
+                {isSubmitting ? "Tworzenie..." : "Utwórz Zlecenie"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -246,16 +259,24 @@ export default function RepairOrdersPage() {
 
       {/* Main Content Area */}
       <GlassCard className="flex flex-col gap-6 border-white/5">
-        {/* Search Bar */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
-          <input 
-            type="text"
-            placeholder="Szukaj zlecenia, problemu lub rejestracji..." 
-            className="pl-10 w-full bg-zinc-900/50 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-xl px-3 py-2"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        {/* Search & Filter */}
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+          <div className="relative w-full md:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
+            <input 
+              type="text"
+              placeholder="Szukaj po nr rej. lub nazwisku..." 
+              className="pl-10 w-full bg-zinc-900/50 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-xl px-3 py-2"
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="text-xs font-medium px-3 py-1.5 rounded-full bg-zinc-800/50 text-zinc-400 border border-zinc-800 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"></span>
+              Aktywne naprawy: <span className="text-zinc-100 ml-1">{orders.filter(o => o.status === 'IN_PROGRESS' || o.status === 'PENDING').length}</span>
+            </div>
+          </div>
         </div>
 
         {/* Orders Table */}
@@ -274,18 +295,18 @@ export default function RepairOrdersPage() {
             <tbody className="divide-y divide-zinc-800/50 bg-transparent">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 animate-pulse">
+                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 animate-pulse">
                     Ładowanie danych...
                   </td>
                 </tr>
-              ) : filteredOrders.length === 0 ? (
+              ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">
-                    Nie znaleziono zleceń.
+                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">
+                    Brak zleceń pasujących do kryteriów.
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
+                orders.map((order) => (
                   <tr 
                     key={order.id} 
                     className="group hover:bg-zinc-800/30 transition-colors duration-200 cursor-pointer"
@@ -341,6 +362,11 @@ export default function RepairOrdersPage() {
             </tbody>
           </table>
         </div>
+        <PaginationControls 
+          page={pagination.page} 
+          totalPages={pagination.totalPages} 
+          onPageChange={handlePageChange} 
+        />
       </GlassCard>
     </div>
   );

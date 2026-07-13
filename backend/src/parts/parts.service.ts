@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { createPaginatedResponse } from '../common/pagination/paginated-response';
 
 @Injectable()
 export class PartsService {
@@ -15,6 +16,21 @@ export class PartsService {
     const page = query?.page || 1;
     const limit = query?.limit || 20;
     const skip = (page - 1) * limit;
+
+    const allowedSortFields = [
+      'createdAt',
+      'name',
+      'oemNumber',
+      'aftermarketNumber',
+      'barcode',
+      'quantity',
+      'price',
+    ];
+    if (query?.sortBy && !allowedSortFields.includes(query.sortBy)) {
+      throw new BadRequestException(
+        `Niedozwolone pole sortowania: ${query.sortBy}. Dozwolone: ${allowedSortFields.join(', ')}`,
+      );
+    }
 
     const where: Prisma.PartWhereInput = {};
     if (query?.search) {
@@ -39,7 +55,7 @@ export class PartsService {
       this.prisma.part.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return createPaginatedResponse(data, total, page, limit);
   }
 
   async findOne(id: string) {

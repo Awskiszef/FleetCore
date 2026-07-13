@@ -10,6 +10,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { apiClient } from "@/lib/api-client";
+
 interface Part {
   id: string;
   name: string;
@@ -33,9 +37,15 @@ interface Supplier {
 export default function InventoryPage() {
   const { user } = useAuth();
   const [parts, setParts] = useState<Part[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +54,6 @@ export default function InventoryPage() {
     name: "",
     oemNumber: "",
     aftermarketNumber: "",
-    manufacturer: "",
     manufacturer: "",
     supplierId: "",
     unitPrice: "",
@@ -56,18 +65,15 @@ export default function InventoryPage() {
 
   const fetchParts = async () => {
     try {
+      const page = Number(searchParams.get("page")) || 1;
+      const search = searchParams.get("search") || "";
       const [partsRes, suppRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/parts`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/suppliers`)
+        apiClient.getParts({ page, limit: 20, search }),
+        apiClient.getSuppliers({ limit: 100 })
       ]);
-      if (partsRes.ok) {
-        const data = await partsRes.json();
-        setParts(data.data || data); // handle pagination if applied
-      }
-      if (suppRes.ok) {
-        const data = await suppRes.json();
-        setSuppliers(data.items || data.data || data);
-      }
+      setParts(partsRes.data);
+      setPagination({ page: partsRes.page, limit: partsRes.limit, totalPages: partsRes.totalPages });
+      setSuppliers(suppRes.data);
     } catch (e) {
       toast.error("Nie udało się pobrać danych magazynu.");
     } finally {
@@ -77,7 +83,25 @@ export default function InventoryPage() {
 
   useEffect(() => {
     fetchParts();
-  }, []);
+  }, [searchParams]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    const params = new URLSearchParams(searchParams);
+    if (val) {
+      params.set("search", val);
+    } else {
+      params.delete("search");
+    }
+    params.set("page", "1");
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage.toString());
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   const handleAddPart = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,99 +188,6 @@ export default function InventoryPage() {
     }
   };
 
-  const filteredParts = Array.isArray(parts) ? parts.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (p.oemNumber && p.oemNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (p.barcode && p.barcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (p.manufacturer && p.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()))
-  ) : [];
-
-  return (
-    <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
-      
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-600">
-            Magazyn Części
-          </h1>
-          <p className="text-zinc-400 mt-2 text-lg">Zarządzaj stanami magazynowymi i zaopatrzeniem.</p>
-        </div>
-        
-        <Button onClick={() => setIsAddDialogOpen(true)} className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium shadow-lg shadow-cyan-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
-          <Plus className="mr-2 h-4 w-4" /> Dodaj Część
-        </Button>
-      </div>
-
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-cyan-400">Dodaj nową część</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Wprowadź dane przedmiotu do magazynu.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2 col-span-2">
-                <Label htmlFor="name" className="text-zinc-300">Nazwa części <span className="text-red-500">*</span></Label>
-                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="np. Klocki hamulcowe przednie" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="oemNumber" className="text-zinc-300">Numer OEM</Label>
-                <Input id="oemNumber" value={formData.oemNumber} onChange={e => setFormData({...formData, oemNumber: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="manufacturer" className="text-zinc-300">Producent</Label>
-                <Input id="manufacturer" value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="np. Bosch" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="quantity" className="text-zinc-300">Ilość <span className="text-red-500">*</span></Label>
-                <Input id="quantity" type="number" min="0" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="minQuantity" className="text-zinc-300">Minimum alertowe</Label>
-                <Input id="minQuantity" type="number" min="0" value={formData.minQuantity} onChange={e => setFormData({...formData, minQuantity: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="unitPrice" className="text-zinc-300">Cena jedn. (PLN) <span className="text-red-500">*</span></Label>
-                <Input id="unitPrice" type="number" step="0.01" min="0" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="barcode" className="text-zinc-300">Kod kreskowy</Label>
-                <Input id="barcode" value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="Zeskanuj kod..." />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="shelfLocation" className="text-zinc-300">Regał / Półka</Label>
-                <Input id="shelfLocation" value={formData.shelfLocation} onChange={e => setFormData({...formData, shelfLocation: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="np. A1-05" />
-              </div>
-              <div className="grid gap-2 col-span-2">
-                <Label htmlFor="supplier" className="text-zinc-300">Dostawca</Label>
-                <select 
-                  id="supplier" 
-                  value={formData.supplierId} 
-                  onChange={e => setFormData({...formData, supplierId: e.target.value})} 
-                  className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Wybierz dostawcę...</option>
-                  {(Array.isArray(suppliers) ? suppliers : []).map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-zinc-700 bg-transparent px-4 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors">
-              Anuluj
-            </DialogClose>
-            <Button type="submit" disabled={isSubmitting} onClick={handleAddPart} className="bg-cyan-600 hover:bg-cyan-500 text-white border-0">
-              {isSubmitting ? "Zapisywanie..." : "Zapisz do magazynu"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <GlassCard className="flex flex-col gap-6 border-white/5">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
           <input 
@@ -264,7 +195,7 @@ export default function InventoryPage() {
             placeholder="Szukaj po nazwie, OEM, producencie..." 
             className="pl-10 w-full bg-zinc-900/50 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500 rounded-xl px-3 py-2"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
 
@@ -286,14 +217,14 @@ export default function InventoryPage() {
                     Ładowanie magazynu...
                   </td>
                 </tr>
-              ) : filteredParts.length === 0 ? (
+              ) : parts.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">
-                    Brak części w magazynie.
+                    Brak części pasujących do kryteriów.
                   </td>
                 </tr>
               ) : (
-                filteredParts.map((part) => (
+                parts.map((part) => (
                   <tr key={part.id} className="group hover:bg-zinc-800/30 transition-colors duration-200">
                     <td className="px-6 py-4">
                       <div className="font-bold text-zinc-100 truncate max-w-[250px]">{part.name}</div>
@@ -331,6 +262,11 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
+        <PaginationControls 
+          page={pagination.page} 
+          totalPages={pagination.totalPages} 
+          onPageChange={handlePageChange} 
+        />
       </GlassCard>
     </div>
   );

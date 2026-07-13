@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { createPaginatedResponse } from '../common/pagination/paginated-response';
 
 @Injectable()
 export class SuppliersService {
@@ -15,9 +20,18 @@ export class SuppliersService {
   }
 
   async findAll(query: PaginationQueryDto) {
-    const { page = 1, limit = 10, search } = query;
+    const page = query?.page || 1;
+    const limit = query?.limit || 10;
     const skip = (page - 1) * limit;
 
+    const allowedSortFields = ['createdAt', 'name', 'nip'];
+    if (query?.sortBy && !allowedSortFields.includes(query.sortBy)) {
+      throw new BadRequestException(
+        `Niedozwolone pole sortowania: ${query.sortBy}. Dozwolone: ${allowedSortFields.join(', ')}`,
+      );
+    }
+
+    const search = query?.search;
     const where = search
       ? {
           OR: [
@@ -33,20 +47,14 @@ export class SuppliersService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: query?.sortBy
+          ? { [query.sortBy]: query.sortOrder }
+          : { createdAt: 'desc' },
       }),
       this.prisma.supplier.count({ where }),
     ]);
 
-    return {
-      items,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return createPaginatedResponse(items, total, page, limit);
   }
 
   async findOne(id: string) {

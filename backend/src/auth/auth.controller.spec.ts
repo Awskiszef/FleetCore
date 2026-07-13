@@ -4,7 +4,10 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 
 jest.mock('jsonwebtoken', () => ({
@@ -72,9 +75,10 @@ describe('AuthController', () => {
 
   it('1. Brak konfiguracji AWS zwraca 503, nie token', async () => {
     settingsService.getAll.mockResolvedValue({}); // no aws config
-    
-    await expect(controller.awsCallback({ code: 'code123' }))
-      .rejects.toThrow(ServiceUnavailableException);
+
+    await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
+      ServiceUnavailableException,
+    );
   });
 
   it('2. AWS_SSO_MOCK_ENABLED=true w produkcji blokuje callback', async () => {
@@ -82,10 +86,12 @@ describe('AuthController', () => {
     process.env.AWS_SSO_MOCK_ENABLED = 'true';
     settingsService.getAll.mockResolvedValue({});
 
-    await expect(controller.awsCallback({ code: 'code123' }))
-      .rejects.toThrow(ServiceUnavailableException);
-    await expect(controller.awsCallback({ code: 'code123' }))
-      .rejects.toThrow('Tryb mock niedostępny w produkcji.');
+    await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
+      ServiceUnavailableException,
+    );
+    await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
+      'Tryb mock niedostępny w produkcji.',
+    );
   });
 
   it('4. Token z błędnym issuer jest odrzucany', async () => {
@@ -93,7 +99,7 @@ describe('AuthController', () => {
       awsCognitoDomain: 'https://domain.com',
       awsCognitoClientId: 'client-id',
       awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback'
+      awsCognitoRedirectUri: 'http://localhost/callback',
     });
 
     // Mock jwt.verify to throw error like it would for wrong issuer
@@ -101,8 +107,9 @@ describe('AuthController', () => {
       cb(new Error('jwt issuer invalid. expected: https://domain.com'));
     });
 
-    await expect(controller.awsCallback({ code: 'code123' }))
-      .rejects.toThrow(UnauthorizedException);
+    await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('5. Token z błędnym audience jest odrzucany', async () => {
@@ -110,15 +117,16 @@ describe('AuthController', () => {
       awsCognitoDomain: 'https://domain.com',
       awsCognitoClientId: 'client-id',
       awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback'
+      awsCognitoRedirectUri: 'http://localhost/callback',
     });
 
     (jwt.verify as jest.Mock).mockImplementation((token, key, options, cb) => {
       cb(new Error('jwt audience invalid. expected: client-id'));
     });
 
-    await expect(controller.awsCallback({ code: 'code123' }))
-      .rejects.toThrow(UnauthorizedException);
+    await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('6. Token z algorytmem innym niż RS256 jest odrzucany', async () => {
@@ -126,15 +134,16 @@ describe('AuthController', () => {
       awsCognitoDomain: 'https://domain.com',
       awsCognitoClientId: 'client-id',
       awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback'
+      awsCognitoRedirectUri: 'http://localhost/callback',
     });
 
     (jwt.verify as jest.Mock).mockImplementation((token, key, options, cb) => {
       cb(new Error('invalid algorithm'));
     });
 
-    await expect(controller.awsCallback({ code: 'code123' }))
-      .rejects.toThrow(UnauthorizedException);
+    await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('7. Użytkownik nieobecny w lokalnej bazie nie otrzymuje tokenu FleetCore', async () => {
@@ -142,7 +151,7 @@ describe('AuthController', () => {
       awsCognitoDomain: 'https://domain.com',
       awsCognitoClientId: 'client-id',
       awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback'
+      awsCognitoRedirectUri: 'http://localhost/callback',
     });
 
     (jwt.verify as jest.Mock).mockImplementation((token, key, options, cb) => {
@@ -151,7 +160,8 @@ describe('AuthController', () => {
 
     usersService.findByEmail.mockResolvedValue(null);
 
-    await expect(controller.awsCallback({ code: 'code123' }))
-      .rejects.toThrow(UnauthorizedException);
+    await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 });

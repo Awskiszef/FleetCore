@@ -10,6 +10,10 @@ import { Plus, Trash2, ShieldAlert, Wrench, User } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { apiClient } from "@/lib/api-client";
+
 interface TeamMember {
   id: string;
   email: string;
@@ -43,8 +47,13 @@ const RoleLabel = ({ role }: { role: string }) => {
 export default function TeamPage() {
   const { user } = useAuth();
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   
   const [form, setForm] = useState({
     fullName: "",
@@ -55,16 +64,21 @@ export default function TeamPage() {
 
   const fetchMembers = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/users`);
-      if (res.ok) {
-        const data = await res.json();
-        setMembers(data);
-      }
+      const page = Number(searchParams.get("page")) || 1;
+      const res = await apiClient.getUsers({ page, limit: 20 });
+      setMembers(res.data);
+      setPagination({ page: res.page, limit: res.limit, totalPages: res.totalPages });
     } catch (e) {
       toast.error("Nie udało się pobrać listy zespołu.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage.toString());
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   useEffect(() => {
@@ -73,7 +87,7 @@ export default function TeamPage() {
     } else {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, searchParams]);
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,6 +202,11 @@ export default function TeamPage() {
           </GlassCard>
         ))}
       </div>
+      <PaginationControls 
+        page={pagination.page} 
+        totalPages={pagination.totalPages} 
+        onPageChange={handlePageChange} 
+      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-zinc-950 border border-zinc-800 text-zinc-100 max-w-md">

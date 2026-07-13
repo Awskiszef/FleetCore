@@ -196,21 +196,27 @@ export class AuthController {
         );
       }
 
-      const decoded = await new Promise<jwt.JwtPayload & { email?: string }>((resolve, reject) => {
-        jwt.verify(
-          tokenData.id_token as string,
-          getKey,
-          {
-            algorithms: ['RS256'],
-            issuer: domain,
-            audience: clientId,
-          },
-          function (err: Error | null, decoded: string | jwt.JwtPayload | undefined) {
-            if (err) return reject(new Error('Weryfikacja JWT nie powiodła się'));
-            resolve(decoded as jwt.JwtPayload & { email?: string });
-          },
-        );
-      });
+      const decoded = await new Promise<jwt.JwtPayload & { email?: string }>(
+        (resolve, reject) => {
+          jwt.verify(
+            tokenData.id_token as string,
+            getKey,
+            {
+              algorithms: ['RS256'],
+              issuer: domain,
+              audience: clientId,
+            },
+            function (
+              err: Error | null,
+              decoded: string | jwt.JwtPayload | undefined,
+            ) {
+              if (err)
+                return reject(new Error('Weryfikacja JWT nie powiodła się'));
+              resolve(decoded as jwt.JwtPayload & { email?: string });
+            },
+          );
+        },
+      );
 
       if (!decoded || !decoded.email) {
         throw new UnauthorizedException('Błędne dane logowania');

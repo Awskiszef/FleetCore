@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { createPaginatedResponse } from '../common/pagination/paginated-response';
 
 @Injectable()
 export class UsersService {
@@ -20,6 +21,13 @@ export class UsersService {
     const page = query?.page || 1;
     const limit = query?.limit || 20;
     const skip = (page - 1) * limit;
+
+    const allowedSortFields = ['createdAt', 'email', 'fullName', 'role'];
+    if (query?.sortBy && !allowedSortFields.includes(query.sortBy)) {
+      throw new BadRequestException(
+        `Niedozwolone pole sortowania: ${query.sortBy}. Dozwolone: ${allowedSortFields.join(', ')}`,
+      );
+    }
 
     const where: Prisma.UserWhereInput = {};
     if (query?.search) {
@@ -48,7 +56,7 @@ export class UsersService {
       this.prisma.user.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return createPaginatedResponse(data, total, page, limit);
   }
 
   async create(data: Prisma.UserCreateInput) {

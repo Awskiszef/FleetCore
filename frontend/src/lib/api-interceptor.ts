@@ -4,7 +4,7 @@ if (typeof window !== 'undefined') {
   const originalFetch = window.fetch;
   
   window.fetch = async function (...args) {
-    let [resource, config] = args;
+    const [resource, config] = args;
     
     // Only intercept requests to our backend
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
