@@ -21,6 +21,7 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Post()
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST')
   async create(@Body() createCustomerDto: CreateCustomerDto) {
     try {
       return await this.customersService.create(createCustomerDto);
@@ -45,6 +46,7 @@ export class CustomersController {
   }
 
   @Patch(':id')
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST')
   async update(
     @Param('id') id: string,
     @Body() updateCustomerDto: UpdateCustomerDto,

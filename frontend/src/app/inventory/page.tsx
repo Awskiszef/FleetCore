@@ -188,6 +188,66 @@ export default function InventoryPage() {
     }
   };
 
+  const canAddPart = user?.role === 'ADMIN' || user?.role === 'OWNER';
+  const canDeletePart = user?.role === 'ADMIN' || user?.role === 'OWNER';
+
+  return (
+    <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-600">
+            Magazyn
+          </h1>
+          <p className="text-zinc-400 mt-2 text-lg">Zarządzaj częściami i kontroluj stany magazynowe.</p>
+        </div>
+        
+        {canAddPart && (
+          <Button onClick={() => setIsAddDialogOpen(true)} className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
+            <Plus className="mr-2 h-4 w-4" /> Dodaj Część
+          </Button>
+        )}
+      </div>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-emerald-400">Dodaj Część</DialogTitle>
+            <DialogDescription className="text-zinc-400">Wprowadź szczegóły nowej części w systemie.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddPart}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label className="text-zinc-300">Nazwa</Label>
+                <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label className="text-zinc-300">Cena netto</Label>
+                  <Input type="number" step="0.01" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" required />
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-zinc-300">Ilość</Label>
+                  <Input type="number" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" required />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-zinc-300">OEM Number (opcjonalnie)</Label>
+                <Input value={formData.oemNumber} onChange={e => setFormData({...formData, oemNumber: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">Anuluj</Button>
+              </DialogClose>
+              <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-500 text-white border-0">
+                {isSubmitting ? "Zapisywanie..." : "Zapisz Część"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <GlassCard className="flex flex-col gap-6 border-white/5">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
           <input 
@@ -252,9 +312,11 @@ export default function InventoryPage() {
                       {part.unitPrice} PLN
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button onClick={() => handleDeletePart(part.id)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full px-3 h-8 transition-all border border-red-500/20 inline-flex items-center justify-center">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDeletePart && (
+                        <Button onClick={() => handleDeletePart(part.id)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full px-3 h-8 transition-all border border-red-500/20 inline-flex items-center justify-center">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -29,6 +29,9 @@ export default function CustomersPage() {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   
+  const { user } = useAuth();
+  const canAddCustomer = user?.role === 'ADMIN' || user?.role === 'OWNER' || user?.role === 'RECEPTIONIST';
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -150,6 +153,30 @@ export default function CustomersPage() {
     }
   };
 
+  return (
+    <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
+      
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-600">
+            Klienci
+          </h1>
+          <p className="text-zinc-400 mt-2 text-lg">Zarządzaj bazą klientów Twojego warsztatu.</p>
+        </div>
+        
+        {canAddCustomer && (
+          <Button onClick={() => setIsDialogOpen(true)} className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium shadow-lg shadow-cyan-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
+            <Plus className="mr-2 h-4 w-4" /> Nowy Klient
+          </Button>
+        )}
+      </div>
+
+      {/* Main Content Area */}
+      <GlassCard className="flex flex-col gap-6 border-white/5">
+        {/* Search Bar */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
           <Input 
             type="text"
             placeholder="Szukaj klienta po nazwisku lub e-mailu..." 
@@ -161,6 +188,89 @@ export default function CustomersPage() {
 
         {/* Customers Table */}
         <div className="overflow-x-auto rounded-xl border border-zinc-800/50">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl text-cyan-400">Dodaj klienta</DialogTitle>
+                <DialogDescription className="text-zinc-400">
+                  Wprowadź dane nowego klienta do systemu.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddCustomer}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label className="text-zinc-300">Typ Klienta</Label>
+                    <select 
+                      className="flex h-9 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500 text-zinc-100"
+                      value={formData.type}
+                      onChange={(e) => setFormData({...formData, type: e.target.value})}
+                    >
+                      <option value="individual">Osoba prywatna</option>
+                      <option value="company">Firma (Polska)</option>
+                      <option value="foreign_company">Firma (Zagraniczna)</option>
+                    </select>
+                  </div>
+
+                  {(formData.type === "company" || formData.type === "foreign_company") && (
+                    <>
+                      <div className="grid gap-2">
+                        <Label htmlFor="nip" className="text-zinc-300">NIP</Label>
+                        <div className="flex gap-2">
+                          <Input id="nip" value={formData.nip} onChange={e => setFormData({...formData, nip: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="np. 1234567890" />
+                          {formData.type === "company" && (
+                            <Button type="button" onClick={handleFetchNip} disabled={isFetchingNip} className="bg-zinc-800 hover:bg-zinc-700 text-cyan-400 border border-cyan-500/30 whitespace-nowrap">
+                              {isFetchingNip ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCode className="h-4 w-4 mr-2" />}
+                              Pobierz GUS
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="companyName" className="text-zinc-300">Nazwa Firmy</Label>
+                        <Input id="companyName" value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="firstName" className="text-zinc-300">Imię</Label>
+                      <Input id="firstName" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" required />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="lastName" className="text-zinc-300">Nazwisko</Label>
+                      <Input id="lastName" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" required />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="email" className="text-zinc-300">Email</Label>
+                    <Input id="email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="phone" className="text-zinc-300">Telefon</Label>
+                    <Input id="phone" type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="address" className="text-zinc-300">Adres</Label>
+                    <Input id="address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="Ulica, kod pocztowy, miasto" />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+                      Anuluj
+                    </Button>
+                  </DialogClose>
+                  <Button type="submit" disabled={isSubmitting} className="bg-cyan-600 hover:bg-cyan-500 text-white border-0">
+                    {isSubmitting ? "Zapisywanie..." : "Zapisz Klienta"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-zinc-900/80 text-zinc-400 uppercase tracking-wider text-xs font-semibold">
               <tr>

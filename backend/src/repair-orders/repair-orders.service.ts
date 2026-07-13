@@ -115,12 +115,30 @@ export class RepairOrdersService {
     id: string,
     data: Prisma.RepairOrderUncheckedUpdateInput,
     userId?: string,
+    userRole?: string,
   ) {
     const existingOrder = await this.prisma.repairOrder.findUnique({
       where: { id },
       include: { customer: true, vehicle: true, parts: true },
     });
     if (!existingOrder) throw new NotFoundException('Zlecenie nie znalezione');
+
+    if (userRole === 'MECHANIC') {
+      if (existingOrder.assignedMechanicId !== userId) {
+        throw new ForbiddenException(
+          'Mechanik może edytować tylko swoje zlecenia.',
+        );
+      }
+      const allowedKeys = ['status', 'diagnosis', 'mechanicNotes'];
+      const invalidKeys = Object.keys(data).filter(
+        (k) => !allowedKeys.includes(k),
+      );
+      if (invalidKeys.length > 0) {
+        throw new ForbiddenException(
+          'Mechanik nie ma uprawnień do edycji tych pól.',
+        );
+      }
+    }
 
     const isFrozen =
       existingOrder.status === 'COMPLETED' ||
@@ -351,11 +369,19 @@ export class RepairOrdersService {
     partId: string,
     quantity: number,
     userId?: string,
+    userRole?: string,
   ) {
     const order = await this.prisma.repairOrder.findUnique({
       where: { id: orderId },
     });
     if (!order) throw new NotFoundException('Zlecenie nie znalezione');
+
+    if (userRole === 'MECHANIC' && order.assignedMechanicId !== userId) {
+      throw new ForbiddenException(
+        'Mechanik może rezerwować części tylko do swoich zleceń.',
+      );
+    }
+
     if (
       order.status === 'COMPLETED' ||
       order.status === 'DELIVERED' ||
@@ -420,11 +446,23 @@ export class RepairOrdersService {
     return true;
   }
 
-  async removePart(orderId: string, partId: string, userId?: string) {
+  async removePart(
+    orderId: string,
+    partId: string,
+    userId?: string,
+    userRole?: string,
+  ) {
     const order = await this.prisma.repairOrder.findUnique({
       where: { id: orderId },
     });
     if (!order) throw new NotFoundException('Zlecenie nie znalezione');
+
+    if (userRole === 'MECHANIC' && order.assignedMechanicId !== userId) {
+      throw new ForbiddenException(
+        'Mechanik może usuwać części tylko ze swoich zleceń.',
+      );
+    }
+
     if (
       order.status === 'COMPLETED' ||
       order.status === 'DELIVERED' ||
@@ -490,5 +528,21 @@ export class RepairOrdersService {
         data: { finalCost: newFinal },
       });
     }
+  }
+
+  async logInvoiceGeneration(
+    orderId: string,
+    invoiceId: string,
+    userId?: string,
+  ) {
+    await this.prisma.auditLog.create({
+      data: {
+        action: 'GENERATE_INVOICE',
+        entity: 'RepairOrder',
+        entityId: orderId,
+        userId: userId,
+        newValues: { invoiceId } as any,
+      },
+    });
   }
 }

@@ -26,6 +26,7 @@ export class VehiclesController {
   ) {}
 
   @Post()
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST')
   async create(@Body() createVehicleDto: CreateVehicleDto) {
     return await this.vehiclesService.create(createVehicleDto as any);
   }
@@ -114,6 +115,7 @@ export class VehiclesController {
   }
 
   @Patch(':id')
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST')
   async update(
     @Param('id') id: string,
     @Body() updateVehicleDto: UpdateVehicleDto,

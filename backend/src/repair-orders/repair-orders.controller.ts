@@ -30,18 +30,15 @@ export class RepairOrdersController {
   ) {}
 
   @Post()
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST')
   async create(
     @Body() createRepairOrderDto: CreateRepairOrderDto,
-    @Request() req: ExpressRequest & { user?: any },
+    @Request() req: ExpressRequest & { user?: { sub: string; role: string } },
   ) {
-    try {
-      return await this.repairOrdersService.create(
-        createRepairOrderDto,
-        req.user?.sub,
-      );
-    } catch (e) {
-      throw e;
-    }
+    return await this.repairOrdersService.create(
+      createRepairOrderDto,
+      req.user?.sub,
+    );
   }
 
   @Get()
@@ -98,6 +95,7 @@ export class RepairOrdersController {
   async createInvoice(
     @Param('id') id: string,
     @Body() body: { status?: string },
+    @Request() req: ExpressRequest & { user?: any },
   ) {
     // 1. Pobierz dane zlecenia (wraz z klientem i pojazdem)
     const order = await this.repairOrdersService.findOne(id);
@@ -131,6 +129,12 @@ export class RepairOrdersController {
       invoiceId: invoice.id.toString(),
       invoiceUrl: invoiceUrl,
     });
+
+    await this.repairOrdersService.logInvoiceGeneration(
+      id,
+      invoice.id.toString(),
+      req.user?.sub,
+    );
 
     return updatedOrder;
   }
@@ -192,20 +196,18 @@ export class RepairOrdersController {
   }
 
   @Patch(':id')
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST', 'MECHANIC')
   async update(
     @Param('id') id: string,
     @Body() updateRepairOrderDto: UpdateRepairOrderDto,
-    @Request() req: ExpressRequest & { user?: any },
+    @Request() req: ExpressRequest & { user?: { sub: string; role: string } },
   ) {
-    try {
-      return await this.repairOrdersService.update(
-        id,
-        updateRepairOrderDto,
-        req.user?.sub,
-      );
-    } catch (e) {
-      throw e;
-    }
+    return await this.repairOrdersService.update(
+      id,
+      updateRepairOrderDto,
+      req.user?.sub,
+      req.user?.role,
+    );
   }
 
   @Delete(':id')
@@ -225,25 +227,33 @@ export class RepairOrdersController {
   }
 
   @Post(':id/parts')
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST', 'MECHANIC')
   async addPart(
     @Param('id') id: string,
     @Body() data: { partId: string; quantity: number },
-    @Request() req: ExpressRequest & { user?: any },
+    @Request() req: ExpressRequest & { user?: { sub: string; role: string } },
   ) {
     return this.repairOrdersService.addPart(
       id,
       data.partId,
       data.quantity,
       req.user?.sub,
+      req.user?.role,
     );
   }
 
   @Delete(':id/parts/:partId')
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST', 'MECHANIC')
   async removePart(
     @Param('id') id: string,
     @Param('partId') partId: string,
-    @Request() req: ExpressRequest & { user?: any },
+    @Request() req: ExpressRequest & { user?: { sub: string; role: string } },
   ) {
-    return this.repairOrdersService.removePart(id, partId, req.user?.sub);
+    return this.repairOrdersService.removePart(
+      id,
+      partId,
+      req.user?.sub,
+      req.user?.role,
+    );
   }
 }

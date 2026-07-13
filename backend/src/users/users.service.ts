@@ -97,10 +97,14 @@ export class UsersService {
     });
   }
 
-  async delete(id: string) {
+  async delete(id: string, reqUser?: { id: string; role: string }) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new BadRequestException('Użytkownik nie istnieje');
+    }
+
+    if (reqUser && reqUser.role === 'ADMIN' && user.role === 'OWNER') {
+      throw new ConflictException('Admin nie może usunąć właściciela');
     }
 
     if (user.role === 'OWNER') {
@@ -121,9 +125,16 @@ export class UsersService {
     id: string,
     temporaryPassword?: string,
     mustChangePassword: boolean = true,
+    reqUser?: { id: string; role: string },
   ) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new BadRequestException('Użytkownik nie istnieje');
+
+    if (reqUser && reqUser.role === 'ADMIN' && user.role === 'OWNER') {
+      throw new ConflictException(
+        'Admin nie może resetować hasła właścicielowi',
+      );
+    }
 
     const passwordHash = temporaryPassword
       ? await bcrypt.hash(temporaryPassword, 12)

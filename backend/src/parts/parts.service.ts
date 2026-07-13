@@ -64,11 +64,39 @@ export class PartsService {
     });
   }
 
-  async update(id: string, data: Prisma.PartUpdateInput) {
-    return this.prisma.part.update({
+  async update(
+    id: string,
+    data: Prisma.PartUpdateInput,
+    userId?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const existing = await this.prisma.part.findUnique({ where: { id } });
+    const updated = await this.prisma.part.update({
       where: { id },
       data,
     });
+
+    if (
+      existing &&
+      data.quantity !== undefined &&
+      existing.quantity !== data.quantity
+    ) {
+      await this.prisma.auditLog.create({
+        data: {
+          userId,
+          action: 'MANUAL_STOCK_UPDATE',
+          entity: 'Part',
+          entityId: id,
+          oldValues: { quantity: existing.quantity } as any,
+          newValues: { quantity: updated.quantity } as any,
+          ipAddress,
+          userAgent,
+        },
+      });
+    }
+
+    return updated;
   }
 
   async remove(id: string) {

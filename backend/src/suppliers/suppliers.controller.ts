@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
+import { Roles } from '../auth/roles.decorator';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -22,6 +23,7 @@ export class SuppliersController {
   constructor(private readonly suppliersService: SuppliersService) {}
 
   @Post()
+  @Roles('OWNER', 'ADMIN')
   create(@Body() createSupplierDto: CreateSupplierDto) {
     return this.suppliersService.create(createSupplierDto);
   }
@@ -37,6 +39,7 @@ export class SuppliersController {
   }
 
   @Patch(':id')
+  @Roles('OWNER', 'ADMIN')
   update(
     @Param('id') id: string,
     @Body() updateSupplierDto: UpdateSupplierDto,
@@ -45,6 +48,7 @@ export class SuppliersController {
   }
 
   @Delete(':id')
+  @Roles('OWNER', 'ADMIN')
   remove(@Param('id') id: string) {
     return this.suppliersService.remove(id);
   }

@@ -9,6 +9,7 @@ import {
   HttpException,
   HttpStatus,
   Query,
+  Request,
 } from '@nestjs/common';
 import { Roles } from '../auth/roles.decorator';
 import { PartsService } from './parts.service';
@@ -21,6 +22,7 @@ export class PartsController {
   constructor(private readonly partsService: PartsService) {}
 
   @Post()
+  @Roles('OWNER', 'ADMIN')
   create(@Body() createPartDto: CreatePartDto) {
     return this.partsService.create(createPartDto);
   }
@@ -36,8 +38,19 @@ export class PartsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePartDto: UpdatePartDto) {
-    return this.partsService.update(id, updatePartDto);
+  @Roles('OWNER', 'ADMIN')
+  update(
+    @Param('id') id: string,
+    @Body() updatePartDto: UpdatePartDto,
+    @Request() req: any,
+  ) {
+    return this.partsService.update(
+      id,
+      updatePartDto,
+      req.user?.sub,
+      req.ip,
+      req.headers['user-agent'],
+    );
   }
 
   @Delete(':id')

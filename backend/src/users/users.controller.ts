@@ -42,16 +42,22 @@ export class UsersController {
   async resetPassword(
     @Param('id') id: string,
     @Body() body: { temporaryPassword?: string; mustChangePassword?: boolean },
+    @Request() req: ExpressRequest & { user?: any },
   ) {
     return this.usersService.resetPassword(
       id,
       body.temporaryPassword,
       body.mustChangePassword,
+      req.user,
     );
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.usersService.delete(id);
+  @Roles('OWNER', 'ADMIN')
+  async delete(
+    @Param('id') id: string,
+    @Request() req: ExpressRequest & { user?: any },
+  ) {
+    return this.usersService.delete(id, req.user);
   }
 }

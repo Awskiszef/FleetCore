@@ -4,16 +4,17 @@ import { SettingsService } from './settings.service';
 import { Roles } from '../auth/roles.decorator';
 
 @Controller('settings')
-@Roles('OWNER')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
+  @Roles('OWNER', 'ADMIN')
   getAll() {
     return this.settingsService.getAll();
   }
 
   @Patch()
+  @Roles('OWNER')
   upsert(
     @Body() data: Record<string, string>,
     @Request() req: ExpressRequest & { user?: any },

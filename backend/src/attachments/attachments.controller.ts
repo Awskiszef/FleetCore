@@ -13,6 +13,8 @@ import {
   UseGuards,
   Inject,
   BadRequestException,
+  ForbiddenException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AttachmentsService } from './attachments.service';
@@ -60,6 +62,7 @@ export class AttachmentsController {
   ) {}
 
   @Post()
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST', 'MECHANIC')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -83,7 +86,23 @@ export class AttachmentsController {
     @UploadedFile() file: Express.Multer.File,
     @Body('entityType') entityType: AttachmentEntityType,
     @Body('entityId') entityId: string,
+    @Req() req: any,
   ) {
+    if (req.user?.role === 'MECHANIC') {
+      if (entityType !== AttachmentEntityType.REPAIR_ORDER) {
+        throw new ForbiddenException(
+          'Mechanik może dodawać załączniki tylko do zleceń naprawy',
+        );
+      }
+      const order = await this.prisma.repairOrder.findUnique({
+        where: { id: entityId },
+      });
+      if (!order || order.assignedMechanicId !== req.user.sub) {
+        throw new ForbiddenException(
+          'Nie możesz dodać załącznika do nieswojego zlecenia',
+        );
+      }
+    }
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }

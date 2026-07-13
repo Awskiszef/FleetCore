@@ -31,7 +31,7 @@ interface CustomerOption {
 
 export default function VehiclesPage() {
   const { user } = useAuth();
-  const canAddVehicle = user?.role === 'ADMIN' || user?.role === 'OWNER';
+  const canAddVehicle = user?.role === 'ADMIN' || user?.role === 'OWNER' || user?.role === 'RECEPTIONIST';
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });

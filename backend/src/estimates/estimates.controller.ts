@@ -12,6 +12,7 @@ import type { Response } from 'express';
 import { EstimatesService } from './estimates.service';
 import { CreateEstimateDto } from './dto/create-estimate.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('estimates')
@@ -19,6 +20,7 @@ export class EstimatesController {
   constructor(private readonly estimatesService: EstimatesService) {}
 
   @Post()
+  @Roles('OWNER', 'ADMIN', 'RECEPTIONIST')
   create(@Body() createEstimateDto: CreateEstimateDto, @Req() req: any) {
     return this.estimatesService.create(createEstimateDto, req.user.sub);
   }
