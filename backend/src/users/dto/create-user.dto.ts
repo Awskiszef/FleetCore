@@ -4,6 +4,9 @@ import {
   IsOptional,
   IsEnum,
   IsBoolean,
+  MinLength,
+  MaxLength,
+  Matches,
 } from 'class-validator';
 import { Role } from '@prisma/client';
 
@@ -13,6 +16,11 @@ export class CreateUserDto {
 
   @IsString()
   @IsOptional()
+  @MinLength(12)
+  @MaxLength(128)
+  @Matches(/\S+/, {
+    message: 'Hasło nie może składać się wyłącznie ze spacji.',
+  })
   password?: string;
 
   @IsString()

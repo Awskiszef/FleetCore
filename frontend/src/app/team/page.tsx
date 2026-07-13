@@ -98,7 +98,8 @@ export default function TeamPage() {
         body: JSON.stringify({
           fullName: form.fullName,
           email: form.email,
-          passwordHash: form.password, // backend handles hashing
+          password: form.password,
+          mustChangePassword: true,
           role: form.role
         }),
       });

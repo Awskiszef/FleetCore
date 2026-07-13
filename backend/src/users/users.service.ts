@@ -1,9 +1,14 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { createPaginatedResponse } from '../common/pagination/paginated-response';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -51,6 +56,7 @@ export class UsersService {
           fullName: true,
           role: true,
           createdAt: true,
+          mustChangePassword: true,
         },
       }),
       this.prisma.user.count({ where }),
@@ -59,13 +65,25 @@ export class UsersService {
     return createPaginatedResponse(data, total, page, limit);
   }
 
-  async create(data: Prisma.UserCreateInput) {
-    const passwordHash = data.passwordHash
-      ? await bcrypt.hash(data.passwordHash, 10)
-      : null;
+  async create(dto: CreateUserDto) {
+    const { password, ...userData } = dto;
+    const email = userData.email.trim().toLowerCase();
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingUser) {
+      throw new ConflictException(
+        'Użytkownik o takim adresie e-mail już istnieje',
+      );
+    }
+
+    const passwordHash = password ? await bcrypt.hash(password, 12) : null;
+
     return this.prisma.user.create({
       data: {
-        ...data,
+        ...userData,
+        email,
         passwordHash,
       },
       select: {
@@ -74,11 +92,54 @@ export class UsersService {
         fullName: true,
         role: true,
         createdAt: true,
+        mustChangePassword: true,
       },
     });
   }
 
   async delete(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new BadRequestException('Użytkownik nie istnieje');
+    }
+
+    if (user.role === 'OWNER') {
+      const ownerCount = await this.prisma.user.count({
+        where: { role: 'OWNER' },
+      });
+      if (ownerCount <= 1) {
+        throw new BadRequestException(
+          'Nie można usunąć ostatniego właściciela systemu',
+        );
+      }
+    }
+
     return this.prisma.user.delete({ where: { id } });
+  }
+
+  async resetPassword(
+    id: string,
+    temporaryPassword?: string,
+    mustChangePassword: boolean = true,
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new BadRequestException('Użytkownik nie istnieje');
+
+    const passwordHash = temporaryPassword
+      ? await bcrypt.hash(temporaryPassword, 12)
+      : null;
+
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        mustChangePassword,
+      },
+      select: {
+        id: true,
+        email: true,
+        mustChangePassword: true,
+      },
+    });
   }
 }

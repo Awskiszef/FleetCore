@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
@@ -37,7 +38,15 @@ export class JwtAuthGuard implements CanActivate {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
       (request as any).user = payload;
-    } catch {
+
+      if (
+        payload.mustChangePassword &&
+        !request.url.includes('/auth/change-password')
+      ) {
+        throw new ForbiddenException('Musisz zmienić hasło.');
+      }
+    } catch (e) {
+      if (e instanceof ForbiddenException) throw e;
       throw new UnauthorizedException();
     }
     return true;
