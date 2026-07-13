@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "Pushing database schema..."
-npx prisma db push
+echo "Deploying database migrations..."
+npx prisma migrate deploy
 
 echo "Starting backend..."
 exec npm run start:prod
