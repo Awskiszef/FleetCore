@@ -46,11 +46,11 @@ export default function LoginPage() {
       const res = await fetch(`http://${window.location.hostname}:3001/auth/aws/config`);
       const config = await res.json();
       
-      const domain = config.domain || "https://twoja-domena.auth.eu-central-1.amazoncognito.com";
+      const domain = config.domain?.replace(/\/$/, '') || "https://twoja-domena.auth.eu-central-1.amazoncognito.com";
       const clientId = config.clientId || "twoj_client_id";
       const redirectUri = config.redirectUri || `http://${window.location.hostname}:3000/auth/aws/callback`;
       
-      const loginUrl = `${domain}/login?client_id=${clientId}&response_type=code&scope=email+openid+profile&redirect_uri=${redirectUri}`;
+      const loginUrl = `${domain}/oauth2/authorize?client_id=${clientId}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(redirectUri)}`;
       
       window.location.href = loginUrl;
     } catch (e) {

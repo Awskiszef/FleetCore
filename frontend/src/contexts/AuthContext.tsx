@@ -31,7 +31,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = localStorage.getItem('token');
       if (!token) {
         setIsLoading(false);
-        if (pathname !== '/login') router.push('/login');
+        if (pathname !== '/login' && !pathname.startsWith('/auth/aws/callback')) {
+          router.push('/login');
+        }
         return;
       }
 
@@ -50,7 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error('Session expired', e);
         localStorage.removeItem('token');
-        if (pathname !== '/login') router.push('/login');
+        if (pathname !== '/login' && !pathname.startsWith('/auth/aws/callback')) {
+          router.push('/login');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -75,8 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen flex items-center justify-center bg-black text-white">Ładowanie...</div>;
   }
 
-  // If not logged in and not on login page, don't render children (avoid flash)
-  if (!user && pathname !== '/login') {
+  // If not logged in and not on a public page, don't render children (avoid flash)
+  if (!user && pathname !== '/login' && !pathname.startsWith('/auth/aws/callback')) {
     return null;
   }
 

@@ -77,8 +77,8 @@ export class AuthController {
     try {
       const params = new URLSearchParams();
       params.append('grant_type', 'authorization_code');
-      params.append('client_id', clientId);
-      params.append('client_secret', clientSecret);
+      params.append('client_id', clientId || '');
+      params.append('client_secret', clientSecret || '');
       params.append('redirect_uri', redirectUri || '');
       params.append('code', body.code);
 
@@ -102,21 +102,18 @@ export class AuthController {
       }
 
       const email = decoded.email;
-      let user = await this.usersService.findByEmail(email);
+      const user = await this.usersService.findByEmail(email);
       
       if (!user) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        user = await this.usersService.create({
-          email: email,
-          fullName: decoded.name || email.split('@')[0],
-          passwordHash: null,
-        });
+        throw new UnauthorizedException('Brak dostępu. Twój adres e-mail nie został dodany do bazy FleetCore.');
       }
 
       return this.authService.login(user);
     } catch (e) {
       console.error('AWS SSO Error:', e);
+      if (e instanceof UnauthorizedException) {
+        throw e;
+      }
       throw new UnauthorizedException('Błąd połączenia z AWS SSO');
     }
   }

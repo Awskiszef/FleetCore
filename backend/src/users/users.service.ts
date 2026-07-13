@@ -46,7 +46,7 @@ export class UsersService implements OnModuleInit {
   }
 
   async create(data: Prisma.UserCreateInput) {
-    const passwordHash = await bcrypt.hash(data.passwordHash, 10);
+    const passwordHash = data.passwordHash ? await bcrypt.hash(data.passwordHash, 10) : null;
     return this.prisma.user.create({
       data: {
         ...data,

@@ -11,6 +11,7 @@ export default function AWSCallbackPage() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const [status, setStatus] = useState("Autoryzacja w toku...");
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
   const hasAttempted = useRef(false);
 
   useEffect(() => {
@@ -40,8 +41,13 @@ export default function AWSCallbackPage() {
           router.push("/");
         } else {
           const err = await response.json().catch(() => ({}));
-          toast.error(err.message || "Błąd weryfikacji AWS SSO.");
-          router.push("/login");
+          // Special handling for unauthorized users from AWS
+          if (err.message?.includes('Brak dostępu')) {
+            setIsUnauthorized(true);
+          } else {
+            toast.error(err.message || "Błąd weryfikacji AWS SSO.");
+            router.push("/login");
+          }
         }
       } catch (e) {
         console.error(e);
@@ -52,6 +58,28 @@ export default function AWSCallbackPage() {
 
     authenticateAWS();
   }, [searchParams, router, login]);
+
+  if (isUnauthorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-950 p-6">
+        <div className="max-w-lg w-full bg-red-900 border border-red-700 rounded-2xl p-10 text-center shadow-[0_0_50px_rgba(239,68,68,0.5)]">
+          <div className="w-20 h-20 bg-red-800 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl text-white font-black">!</span>
+          </div>
+          <h1 className="text-4xl font-black text-white mb-4 uppercase tracking-wider">Odmowa Dostępu</h1>
+          <p className="text-red-200 text-lg mb-10">
+            Twój adres e-mail nie widnieje w bazie danych systemu. Nie masz uprawnień do korzystania z tej aplikacji.
+          </p>
+          <button 
+            onClick={() => router.push('/login')}
+            className="w-full py-4 px-6 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all uppercase tracking-widest"
+          >
+            Powrót do logowania
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-950">
