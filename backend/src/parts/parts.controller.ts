@@ -22,7 +22,7 @@ export class PartsController {
 
   @Post()
   create(@Body() createPartDto: CreatePartDto) {
-    return this.partsService.create(createPartDto as any);
+    return this.partsService.create(createPartDto);
   }
 
   @Get()
@@ -36,11 +36,8 @@ export class PartsController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updatePartDto: UpdatePartDto,
-  ) {
-    return this.partsService.update(id, updatePartDto as any);
+  update(@Param('id') id: string, @Body() updatePartDto: UpdatePartDto) {
+    return this.partsService.update(id, updatePartDto);
   }
 
   @Delete(':id')

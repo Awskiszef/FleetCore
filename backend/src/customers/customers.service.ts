@@ -33,7 +33,9 @@ export class CustomersService {
         include: { vehicles: true },
         skip,
         take: limit,
-        orderBy: query?.sortBy ? { [query.sortBy]: query.sortOrder } : { createdAt: 'desc' },
+        orderBy: query?.sortBy
+          ? { [query.sortBy]: query.sortOrder }
+          : { createdAt: 'desc' },
       }),
       this.prisma.customer.count({ where }),
     ]);

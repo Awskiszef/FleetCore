@@ -46,16 +46,20 @@ export default function AWSCallbackPage() {
 
         if (response.ok) {
           const data = await response.json();
+          sessionStorage.removeItem('aws_state');
+          sessionStorage.removeItem('aws_code_verifier');
           login(data.access_token);
           toast.success("Zalogowano pomyślnie przez AWS SSO!");
           router.push("/");
         } else {
+          sessionStorage.removeItem('aws_state');
+          sessionStorage.removeItem('aws_code_verifier');
           const err = await response.json().catch(() => ({}));
           // Special handling for unauthorized users from AWS
-          if (err.message?.includes('Brak dostępu')) {
+          if (err.message?.includes('Błędne dane logowania') || err.message?.includes('Brak dostępu')) {
             setIsUnauthorized(true);
           } else {
-            toast.error(err.message || "Błąd weryfikacji AWS SSO.");
+            toast.error("Błąd weryfikacji AWS SSO.");
             router.push("/login");
           }
         }
@@ -77,14 +81,15 @@ export default function AWSCallbackPage() {
             <span className="text-4xl text-white font-black">!</span>
           </div>
           <h1 className="text-4xl font-black text-white mb-4 uppercase tracking-wider">Odmowa Dostępu</h1>
-          <p className="text-red-200 text-2xl font-bold mb-10">
-            Sorry cwelu wypierdalaj
+          <p className="text-red-200 text-lg font-medium mb-10">
+            Nie masz uprawnień do korzystania z FleetCore.<br/>
+            Skontaktuj się z administratorem systemu.
           </p>
           <button 
             onClick={() => router.push('/login')}
             className="w-full py-4 px-6 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all uppercase tracking-widest"
           >
-            ok wypierdalam
+            Powrót do logowania
           </button>
         </div>
       </div>

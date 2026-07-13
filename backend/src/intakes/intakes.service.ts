@@ -22,7 +22,9 @@ export class IntakesService {
   }
 
   async findOne(id: string) {
-    const intake = await this.prisma.vehicleIntake.findUnique({ where: { id } });
+    const intake = await this.prisma.vehicleIntake.findUnique({
+      where: { id },
+    });
     if (!intake) throw new NotFoundException('Intake not found');
     return intake;
   }

@@ -32,7 +32,9 @@ export class VehiclesService {
         include: { customer: true },
         skip,
         take: limit,
-        orderBy: query?.sortBy ? { [query.sortBy]: query.sortOrder } : { createdAt: 'desc' },
+        orderBy: query?.sortBy
+          ? { [query.sortBy]: query.sortOrder }
+          : { createdAt: 'desc' },
       }),
       this.prisma.vehicle.count({ where }),
     ]);

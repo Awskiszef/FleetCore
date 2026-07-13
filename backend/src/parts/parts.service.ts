@@ -31,7 +31,9 @@ export class PartsService {
         where,
         skip,
         take: limit,
-        orderBy: query?.sortBy ? { [query.sortBy]: query.sortOrder } : { createdAt: 'desc' },
+        orderBy: query?.sortBy
+          ? { [query.sortBy]: query.sortOrder }
+          : { createdAt: 'desc' },
         include: { supplier: true },
       }),
       this.prisma.part.count({ where }),

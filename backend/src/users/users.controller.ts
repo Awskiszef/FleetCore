@@ -27,7 +27,7 @@ export class UsersController {
   @Post()
   @Roles('OWNER', 'ADMIN')
   create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto as any);
+    return this.usersService.create(createUserDto);
   }
 
   @Delete(':id')

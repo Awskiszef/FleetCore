@@ -34,7 +34,9 @@ export class UsersService {
         where,
         skip,
         take: limit,
-        orderBy: query?.sortBy ? { [query.sortBy]: query.sortOrder || 'asc' } : { createdAt: 'desc' },
+        orderBy: query?.sortBy
+          ? { [query.sortBy]: query.sortOrder || 'asc' }
+          : { createdAt: 'desc' },
         select: {
           id: true,
           email: true,

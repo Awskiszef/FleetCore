@@ -14,7 +14,10 @@ export class SettingsController {
   }
 
   @Patch()
-  upsert(@Body() data: Record<string, string>, @Request() req: ExpressRequest & { user?: any }) {
+  upsert(
+    @Body() data: Record<string, string>,
+    @Request() req: ExpressRequest & { user?: any },
+  ) {
     const auditMeta = {
       userId: req.user?.sub,
       ipAddress: req.ip,

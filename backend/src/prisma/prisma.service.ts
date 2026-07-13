@@ -5,8 +5,15 @@ import { PrismaClient } from '@prisma/client';
 export class PrismaService extends PrismaClient implements OnModuleInit {
   async onModuleInit() {
     this.$use(async (params, next) => {
-      const modelsWithDeletedAt = ['User', 'Customer', 'Vehicle', 'RepairOrder', 'Part', 'FleetVehicle'];
-      
+      const modelsWithDeletedAt = [
+        'User',
+        'Customer',
+        'Vehicle',
+        'RepairOrder',
+        'Part',
+        'FleetVehicle',
+      ];
+
       if (params.model && modelsWithDeletedAt.includes(params.model)) {
         if (params.action === 'findUnique' || params.action === 'findFirst') {
           params.action = 'findFirst';
@@ -26,7 +33,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     });
 
     this.$use(async (params, next) => {
-      const modelsWithDeletedAt = ['User', 'Customer', 'Vehicle', 'RepairOrder', 'Part', 'FleetVehicle'];
+      const modelsWithDeletedAt = [
+        'User',
+        'Customer',
+        'Vehicle',
+        'RepairOrder',
+        'Part',
+        'FleetVehicle',
+      ];
 
       if (params.model && modelsWithDeletedAt.includes(params.model)) {
         if (params.action == 'delete') {

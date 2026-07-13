@@ -40,8 +40,16 @@ export class RepairOrdersService {
     const where: Prisma.RepairOrderWhereInput = {};
     if (query?.search) {
       where.OR = [
-        { vehicle: { licensePlate: { contains: query.search, mode: 'insensitive' } } },
-        { customer: { fullName: { contains: query.search, mode: 'insensitive' } } },
+        {
+          vehicle: {
+            licensePlate: { contains: query.search, mode: 'insensitive' },
+          },
+        },
+        {
+          customer: {
+            fullName: { contains: query.search, mode: 'insensitive' },
+          },
+        },
       ];
     }
 
@@ -79,21 +87,31 @@ export class RepairOrdersService {
     return order;
   }
 
-  async update(id: string, data: Prisma.RepairOrderUncheckedUpdateInput, userId?: string) {
+  async update(
+    id: string,
+    data: Prisma.RepairOrderUncheckedUpdateInput,
+    userId?: string,
+  ) {
     const existingOrder = await this.prisma.repairOrder.findUnique({
       where: { id },
       include: { customer: true, vehicle: true, parts: true },
     });
     if (!existingOrder) throw new NotFoundException('Zlecenie nie znalezione');
 
-    const isFrozen = existingOrder.status === 'COMPLETED' || existingOrder.status === 'DELIVERED';
-    
+    const isFrozen =
+      existingOrder.status === 'COMPLETED' ||
+      existingOrder.status === 'DELIVERED';
+
     // Jeśli zamrożone, upewnijmy się że próbują zmienić TYLKO status (np. cofnąć) lub dodają fakturę
     if (isFrozen) {
       const allowedKeys = ['status', 'invoiceId', 'invoiceUrl'];
-      const attemptToChangeFrozenData = Object.keys(data).some(k => !allowedKeys.includes(k));
+      const attemptToChangeFrozenData = Object.keys(data).some(
+        (k) => !allowedKeys.includes(k),
+      );
       if (attemptToChangeFrozenData) {
-        throw new ForbiddenException('Zlecenie jest zamrożone (zakończone). Edycja zablokowana.');
+        throw new ForbiddenException(
+          'Zlecenie jest zamrożone (zakończone). Edycja zablokowana.',
+        );
       }
     }
 
@@ -110,7 +128,7 @@ export class RepairOrdersService {
 
     if (data.status && data.status !== existingOrder.status) {
       const status = data.status as RepairOrderStatus;
-      
+
       await this.prisma.repairOrderHistory.create({
         data: {
           repairOrderId: id,
@@ -125,9 +143,9 @@ export class RepairOrdersService {
         for (const p of existingOrder.parts) {
           await this.prisma.part.update({
             where: { id: p.partId },
-            data: { 
+            data: {
               quantity: { decrement: p.quantity },
-              reservedQuantity: { decrement: p.quantity } 
+              reservedQuantity: { decrement: p.quantity },
             },
           });
           await this.prisma.inventoryTransaction.create({
@@ -138,7 +156,7 @@ export class RepairOrdersService {
               repairOrderId: id,
               userId: userId,
               notes: 'Zakończenie zlecenia - stałe zdjęcie ze stanu',
-            }
+            },
           });
         }
       }
@@ -178,7 +196,9 @@ export class RepairOrdersService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.repairOrder.findUnique({ where: { id }});
+    const existing = await this.prisma.repairOrder.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException();
     // Jeśli używamy soft delete za pomocą Prisma Extension, to normalne delete zrobi update deletedAt.
     return this.prisma.repairOrder.delete({
@@ -186,19 +206,30 @@ export class RepairOrdersService {
     });
   }
 
-  async addPart(orderId: string, partId: string, quantity: number, userId?: string) {
-    const order = await this.prisma.repairOrder.findUnique({ where: { id: orderId } });
+  async addPart(
+    orderId: string,
+    partId: string,
+    quantity: number,
+    userId?: string,
+  ) {
+    const order = await this.prisma.repairOrder.findUnique({
+      where: { id: orderId },
+    });
     if (!order) throw new NotFoundException('Zlecenie nie znalezione');
     if (order.status === 'COMPLETED' || order.status === 'DELIVERED') {
-      throw new ForbiddenException('Zlecenie zamrożone, nie można dodać części.');
+      throw new ForbiddenException(
+        'Zlecenie zamrożone, nie można dodać części.',
+      );
     }
 
     const part = await this.prisma.part.findUnique({ where: { id: partId } });
     if (!part) throw new NotFoundException('Część nie znaleziona');
-    
+
     const available = part.quantity - part.reservedQuantity;
     if (available < quantity) {
-      throw new BadRequestException(`Brak wystarczającej ilości w magazynie. Dostępne: ${available}`);
+      throw new BadRequestException(
+        `Brak wystarczającej ilości w magazynie. Dostępne: ${available}`,
+      );
     }
 
     const existing = await this.prisma.repairOrderPart.findUnique({
@@ -226,7 +257,7 @@ export class RepairOrdersService {
           repairOrderId: orderId,
           userId: userId,
           notes: 'Rezerwacja dla zlecenia',
-        }
+        },
       }),
       this.prisma.repairOrderPart.create({
         data: {
@@ -235,7 +266,7 @@ export class RepairOrdersService {
           quantity: quantity,
           priceAtUsage: part.unitPrice,
         },
-      })
+      }),
     ]);
 
     await this.recalculateCost(orderId);
@@ -243,10 +274,14 @@ export class RepairOrdersService {
   }
 
   async removePart(orderId: string, partId: string, userId?: string) {
-    const order = await this.prisma.repairOrder.findUnique({ where: { id: orderId } });
+    const order = await this.prisma.repairOrder.findUnique({
+      where: { id: orderId },
+    });
     if (!order) throw new NotFoundException('Zlecenie nie znalezione');
     if (order.status === 'COMPLETED' || order.status === 'DELIVERED') {
-      throw new ForbiddenException('Zlecenie zamrożone, nie można usuwać części.');
+      throw new ForbiddenException(
+        'Zlecenie zamrożone, nie można usuwać części.',
+      );
     }
 
     const link = await this.prisma.repairOrderPart.findUnique({
@@ -270,11 +305,11 @@ export class RepairOrdersService {
           repairOrderId: orderId,
           userId: userId,
           notes: 'Anulowanie rezerwacji z zlecenia',
-        }
+        },
       }),
       this.prisma.repairOrderPart.delete({
         where: { id: link.id },
-      })
+      }),
     ]);
 
     await this.recalculateCost(orderId);

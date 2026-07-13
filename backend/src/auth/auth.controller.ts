@@ -3,12 +3,17 @@ import {
   Post,
   Body,
   UnauthorizedException,
+  ServiceUnavailableException,
   Get,
   Request,
 } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
+import * as bcrypt from 'bcrypt';
+import jwksClient from 'jwks-rsa';
+import * as jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
+import { Throttle } from '@nestjs/throttler';
 
 import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,14 +30,23 @@ export class AuthController {
   ) {}
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
-  async login(@Body() body: { email?: string, password?: string }) {
-    if (!body.email || !body.password) throw new UnauthorizedException('Brak danych logowania');
-    const user = await this.authService.validateUser(body.email, body.password);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+  async login(@Body() body: { email?: string; password?: string }) {
+    try {
+      if (!body.email || !body.password)
+        throw new UnauthorizedException('Błędne dane logowania');
+      const user = await this.authService.validateUser(
+        body.email,
+        body.password,
+      );
+      if (!user) {
+        throw new UnauthorizedException('Błędne dane logowania');
+      }
+      return this.authService.login(user);
+    } catch (e) {
+      throw new UnauthorizedException('Błędne dane logowania');
     }
-    return this.authService.login(user);
   }
 
   @Get('me')
@@ -47,7 +61,10 @@ export class AuthController {
   }
 
   @Post('change-password')
-  async changePassword(@Request() req: ExpressRequest & { user?: any }, @Body() body: { oldPassword?: string, newPassword?: string }) {
+  async changePassword(
+    @Request() req: ExpressRequest & { user?: any },
+    @Body() body: { oldPassword?: string; newPassword?: string },
+  ) {
     const { oldPassword, newPassword } = body;
     if (!newPassword) {
       throw new UnauthorizedException('Nowe hasło jest wymagane');
@@ -59,7 +76,6 @@ export class AuthController {
     // Only verify old password if the user is not logging in via AWS
     // or if they have a password hash set
     if (user.passwordHash) {
-      const bcrypt = require('bcrypt');
       const isMatch = await bcrypt.compare(
         oldPassword || '',
         user.passwordHash,
@@ -69,7 +85,6 @@ export class AuthController {
       }
     }
 
-    const bcrypt = require('bcrypt');
     const newHash = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.user.update({
@@ -100,10 +115,11 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('aws/callback')
   async awsCallback(@Body() body: { code: string; codeVerifier?: string }) {
     if (!body.code) {
-      throw new UnauthorizedException('Brak kodu autoryzacyjnego AWS');
+      throw new UnauthorizedException('Błędne dane logowania');
     }
 
     const map = await this.settingsService.getAll(false);
@@ -116,12 +132,27 @@ export class AuthController {
     const redirectUri =
       map['awsCognitoRedirectUri'] || process.env.AWS_COGNITO_REDIRECT_URI;
 
-    // Jeżeli zdefiniowano 'mock' w secret, to omijamy AWS by sprawdzić mechanizm na localhoscie
-    if (!domain || !clientId || clientSecret === 'twoj_client_secret') {
-      const mockUser = await this.usersService.findByEmail('admin@atlashc.pl');
-      if (mockUser) return this.authService.login(mockUser);
-      throw new UnauthorizedException(
-        'Brak konfiguracji AWS SSO (mock timeout)',
+    if (!domain || !clientId || !clientSecret || !redirectUri) {
+      if (
+        process.env.NODE_ENV === 'development' &&
+        process.env.AWS_SSO_MOCK_ENABLED === 'true'
+      ) {
+        const mockUser = await this.usersService.findByEmail('mock@atlashc.pl');
+        if (mockUser) return this.authService.login(mockUser);
+        throw new UnauthorizedException('Błędne dane logowania');
+      }
+
+      if (
+        process.env.NODE_ENV === 'production' &&
+        process.env.AWS_SSO_MOCK_ENABLED === 'true'
+      ) {
+        throw new ServiceUnavailableException(
+          'Tryb mock niedostępny w produkcji.',
+        );
+      }
+
+      throw new ServiceUnavailableException(
+        'Logowanie AWS SSO nie jest w pełni skonfigurowane.',
       );
     }
 
@@ -150,56 +181,52 @@ export class AuthController {
 
       const tokenData = await tokenResponse.json();
 
-      const jwksClient = require('jwks-rsa');
-      const jwt = require('jsonwebtoken');
-
       const client = jwksClient({
         jwksUri: `${domain}/.well-known/jwks.json`,
       });
 
-      function getKey(header: any, callback: any) {
-        client.getSigningKey(header.kid, function (err: any, key: any) {
-          if (err) return callback(err);
-          const signingKey = key.publicKey || key.rsaPublicKey;
-          callback(null, signingKey);
-        });
+      function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) {
+        client.getSigningKey(
+          header.kid,
+          function (err: Error | null, key?: jwksClient.SigningKey) {
+            if (err || !key) return callback(err || new Error('Brak klucza'));
+            const signingKey = key.getPublicKey();
+            callback(null, signingKey);
+          },
+        );
       }
 
-      const decoded = (await new Promise((resolve, reject) => {
+      const decoded = await new Promise<jwt.JwtPayload & { email?: string }>((resolve, reject) => {
         jwt.verify(
-          tokenData.id_token,
+          tokenData.id_token as string,
           getKey,
           {
+            algorithms: ['RS256'],
             issuer: domain,
             audience: clientId,
           },
-          function (err: any, decoded: any) {
-            if (err) return reject(err);
-            resolve(decoded);
+          function (err: Error | null, decoded: string | jwt.JwtPayload | undefined) {
+            if (err) return reject(new Error('Weryfikacja JWT nie powiodła się'));
+            resolve(decoded as jwt.JwtPayload & { email?: string });
           },
         );
-      })) as any;
+      });
 
       if (!decoded || !decoded.email) {
-        throw new UnauthorizedException('Brak adresu email w tokenie z AWS');
+        throw new UnauthorizedException('Błędne dane logowania');
       }
 
       const email = decoded.email;
       const user = await this.usersService.findByEmail(email);
 
       if (!user) {
-        throw new UnauthorizedException(
-          'Brak dostępu. Twój adres e-mail nie został dodany do bazy FleetCore.',
-        );
+        throw new UnauthorizedException('Błędne dane logowania');
       }
 
       return this.authService.login(user);
     } catch (e) {
-      console.error('AWS SSO Error:', e);
-      if (e instanceof UnauthorizedException) {
-        throw e;
-      }
-      throw new UnauthorizedException('Błąd połączenia z AWS SSO');
+      if (e instanceof ServiceUnavailableException) throw e;
+      throw new UnauthorizedException('Błędne dane logowania');
     }
   }
 }

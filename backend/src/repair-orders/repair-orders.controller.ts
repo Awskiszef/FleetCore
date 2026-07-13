@@ -30,9 +30,15 @@ export class RepairOrdersController {
   ) {}
 
   @Post()
-  async create(@Body() createRepairOrderDto: CreateRepairOrderDto, @Request() req: ExpressRequest & { user?: any }) {
+  async create(
+    @Body() createRepairOrderDto: CreateRepairOrderDto,
+    @Request() req: ExpressRequest & { user?: any },
+  ) {
     try {
-      return await this.repairOrdersService.create(createRepairOrderDto as any, req.user?.sub);
+      return await this.repairOrdersService.create(
+        createRepairOrderDto,
+        req.user?.sub,
+      );
     } catch (e) {
       throw e;
     }
@@ -192,7 +198,11 @@ export class RepairOrdersController {
     @Request() req: ExpressRequest & { user?: any },
   ) {
     try {
-      return await this.repairOrdersService.update(id, updateRepairOrderDto as any, req.user?.sub);
+      return await this.repairOrdersService.update(
+        id,
+        updateRepairOrderDto,
+        req.user?.sub,
+      );
     } catch (e) {
       throw e;
     }
@@ -220,12 +230,17 @@ export class RepairOrdersController {
     @Body() data: { partId: string; quantity: number },
     @Request() req: ExpressRequest & { user?: any },
   ) {
-    return this.repairOrdersService.addPart(id, data.partId, data.quantity, req.user?.sub);
+    return this.repairOrdersService.addPart(
+      id,
+      data.partId,
+      data.quantity,
+      req.user?.sub,
+    );
   }
 
   @Delete(':id/parts/:partId')
   async removePart(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Param('partId') partId: string,
     @Request() req: ExpressRequest & { user?: any },
   ) {

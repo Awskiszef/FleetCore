@@ -125,7 +125,7 @@ export class VehiclesController {
     @Param('id') id: string,
     @Body() updateVehicleDto: UpdateVehicleDto,
   ) {
-    return await this.vehiclesService.update(id, updateVehicleDto as any);
+    return await this.vehiclesService.update(id, updateVehicleDto);
   }
 
   @Delete(':id')

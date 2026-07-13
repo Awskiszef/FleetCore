@@ -23,7 +23,7 @@ export class CustomersController {
   @Post()
   async create(@Body() createCustomerDto: CreateCustomerDto) {
     try {
-      return await this.customersService.create(createCustomerDto as any);
+      return await this.customersService.create(createCustomerDto);
     } catch (error) {
       throw error;
     }
@@ -45,9 +45,12 @@ export class CustomersController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateCustomerDto: UpdateCustomerDto,
+  ) {
     try {
-      return await this.customersService.update(id, updateCustomerDto as any);
+      return await this.customersService.update(id, updateCustomerDto);
     } catch (error) {
       throw error;
     }
