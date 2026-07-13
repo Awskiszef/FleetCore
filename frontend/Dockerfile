@@ -1,19 +1,21 @@
 # /frontend/Dockerfile
-FROM node:18-alpine
-
+FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Kopiowanie plików konfiguracyjnych i instalacja zależności
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
-# Kopiowanie reszty kodu
 COPY . .
-
-# Budowanie aplikacji Next.js
 RUN npm run build
 
-EXPOSE 3001
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV production
 
-# Start aplikacji
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3001
 CMD ["npm", "run", "start"]

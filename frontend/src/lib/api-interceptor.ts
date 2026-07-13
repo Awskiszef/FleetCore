@@ -6,8 +6,9 @@ if (typeof window !== 'undefined') {
   window.fetch = async function (...args) {
     let [resource, config] = args;
     
-    // Only intercept requests to our backend (port 3001)
-    if (typeof resource === 'string' && (resource.includes(':3001') || resource.includes('localhost:3001'))) {
+    // Only intercept requests to our backend
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    if (typeof resource === 'string' && (apiUrl && resource.startsWith(apiUrl))) {
       const token = localStorage.getItem('token');
       
       if (token) {

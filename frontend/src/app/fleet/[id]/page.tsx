@@ -87,7 +87,7 @@ export default function FleetVehicleProfilePage() {
 
   const fetchVehicle = async () => {
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/fleet/${vehicleId}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/fleet/${vehicleId}`);
       if (response.ok) {
         const data = await response.json();
         setVehicle(data);
@@ -110,7 +110,7 @@ export default function FleetVehicleProfilePage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/fleet/${vehicleId}/logs`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/fleet/${vehicleId}/logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -145,7 +145,7 @@ export default function FleetVehicleProfilePage() {
   const handleDeleteLog = async (logId: string) => {
     if (!confirm("Czy na pewno chcesz usunąć ten wpis?")) return;
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/fleet/logs/${logId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/fleet/logs/${logId}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -161,7 +161,7 @@ export default function FleetVehicleProfilePage() {
   const handleDeleteVehicle = async () => {
     if (!window.confirm("Czy na pewno chcesz usunąć ten pojazd ze swojej floty? Operacja jest nieodwracalna.")) return;
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/fleet/${vehicleId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/fleet/${vehicleId}`, {
         method: "DELETE",
       });
       if (response.ok) {

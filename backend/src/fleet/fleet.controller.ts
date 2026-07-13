@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
+import { Roles } from '../auth/roles.decorator';
 import { FleetService } from './fleet.service';
 import { Prisma } from '@prisma/client';
 
@@ -22,22 +31,30 @@ export class FleetController {
   }
 
   @Patch(':id')
-  updateVehicle(@Param('id') id: string, @Body() data: Prisma.FleetVehicleUpdateInput) {
+  updateVehicle(
+    @Param('id') id: string,
+    @Body() data: Prisma.FleetVehicleUpdateInput,
+  ) {
     return this.fleetService.updateVehicle(id, data);
   }
 
   @Delete(':id')
-  removeVehicle(@Param('id') id: string) {
+  @Roles('OWNER', 'ADMIN')
+  remove(@Param('id') id: string) {
     return this.fleetService.removeVehicle(id);
   }
 
   // Logs
   @Post(':id/logs')
-  createLog(@Param('id') id: string, @Body() data: Omit<Prisma.FleetVehicleLogCreateInput, 'fleetVehicle'>) {
+  createLog(
+    @Param('id') id: string,
+    @Body() data: Omit<Prisma.FleetVehicleLogCreateInput, 'fleetVehicle'>,
+  ) {
     return this.fleetService.createLog(id, data);
   }
 
   @Delete('logs/:logId')
+  @Roles('OWNER', 'ADMIN')
   removeLog(@Param('logId') logId: string) {
     return this.fleetService.removeLog(logId);
   }

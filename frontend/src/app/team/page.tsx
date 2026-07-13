@@ -55,7 +55,7 @@ export default function TeamPage() {
 
   const fetchMembers = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/users`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/users`);
       if (res.ok) {
         const data = await res.json();
         setMembers(data);
@@ -78,7 +78,7 @@ export default function TeamPage() {
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/users`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -109,7 +109,7 @@ export default function TeamPage() {
     }
     if (!confirm("Czy na pewno usunąć tego pracownika?")) return;
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/users/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/users/${id}`, {
         method: "DELETE"
       });
       if (res.ok) {

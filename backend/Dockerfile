@@ -1,22 +1,25 @@
 # /backend/Dockerfile
-FROM node:18-alpine
-
+FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Kopiowanie plików konfiguracyjnych i instalacja zależności
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
-# Kopiowanie reszty kodu
 COPY . .
-
-# Generowanie klienta Prisma
 RUN npx prisma generate
-
-# Budowanie aplikacji NestJS
 RUN npm run build
 
-EXPOSE 3000
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV production
 
-# Start aplikacji w trybie produkcyjnym
-CMD ["npm", "run", "start:prod"]
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY docker-entrypoint.sh .
+
+RUN chmod +x docker-entrypoint.sh
+
+EXPOSE 3000
+ENTRYPOINT ["./docker-entrypoint.sh"]

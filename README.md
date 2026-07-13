@@ -87,11 +87,19 @@ Aplikacja jest pełnoprawnym projektem typu Full-Stack. Wykorzystano tu topowe n
 * **Baza Danych i Autoryzacja:** 
   - Relacyjna baza `PostgreSQL`, zintegrowana przez ORM `Prisma`.
   - Architektura oparta na Role-Based Access Control (RBAC): `ADMIN`, `OWNER`, `RECEPTIONIST`, `MECHANIC`.
-  - Zintegrowane przepływy uwierzytelniania przez **AWS Cognito / IAM**.
+  - Zintegrowane przepływy uwierzytelniania przez **AWS Cognito / IAM** z wymianą kluczy z użyciem PKCE oraz weryfikacją JWKS (RS256).
+
+## 🔒 4. Bezpieczeństwo i Hardening
+Aplikacja wdrożyła ścisłe wytyczne `PHASE_1_SECURITY`:
+- **Autoryzacja:** Pełne uwierzytelnianie tokenów (JWT_SECRET z env), weryfikacja JWKS dla tokenów chmurowych AWS.
+- **RBAC:** Ścisła kontrola uprawnień za pomocą `@Roles()`, zabezpieczenie newralgicznych endpointów (np. fakturowanie, usuwanie danych, ustawienia).
+- **Bezpieczeństwo Załączników:** Pobieranie plików uwarunkowane tokenem JWT, brak dostępu z zewnątrz (usunięto ServeStaticModule), white-listing formatów, limity wagowe.
+- **Bezpieczeństwo Ustawień:** Szyfrowanie wrażliwych kluczy w bazie danych za pomocą AES-256-CBC. Automatyczne maskowanie w endpointach. Rejestracja zmian w systemie `AuditLog`.
+- **Ruch Sieciowy:** Wbudowany Rate Limiting (`@nestjs/throttler`), ograniczony `CORS` i restrykcyjna `ValidationPipe`.
 
 ---
 
-## ⚙️ 4. Instalacja i Konfiguracja Środowiska
+## ⚙️ 5. Instalacja i Konfiguracja Środowiska
 
 Aby uruchomić projekt, upewnij się, że posiadasz środowisko NodeJS oraz bazę PostgreSQL.
 

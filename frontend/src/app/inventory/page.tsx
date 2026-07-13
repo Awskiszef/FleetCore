@@ -16,14 +16,24 @@ interface Part {
   oemNumber: string | null;
   aftermarketNumber: string | null;
   manufacturer: string | null;
-  supplier: string | null;
+  supplierId: string | null;
+  supplier: { name: string } | null;
   unitPrice: number;
   quantity: number;
+  minQuantity: number;
+  barcode: string | null;
+  shelfLocation: string | null;
+}
+
+interface Supplier {
+  id: string;
+  name: string;
 }
 
 export default function InventoryPage() {
   const { user } = useAuth();
   const [parts, setParts] = useState<Part[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -35,20 +45,31 @@ export default function InventoryPage() {
     oemNumber: "",
     aftermarketNumber: "",
     manufacturer: "",
-    supplier: "",
+    manufacturer: "",
+    supplierId: "",
     unitPrice: "",
-    quantity: "0"
+    quantity: "0",
+    minQuantity: "0",
+    barcode: "",
+    shelfLocation: ""
   });
 
   const fetchParts = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/parts`);
-      if (res.ok) {
-        const data = await res.json();
-        setParts(data);
+      const [partsRes, suppRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/parts`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/suppliers`)
+      ]);
+      if (partsRes.ok) {
+        const data = await partsRes.json();
+        setParts(data.data || data); // handle pagination if applied
+      }
+      if (suppRes.ok) {
+        const data = await suppRes.json();
+        setSuppliers(data.items || data.data || data);
       }
     } catch (e) {
-      toast.error("Nie udało się pobrać listy części.");
+      toast.error("Nie udało się pobrać danych magazynu.");
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +88,7 @@ export default function InventoryPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/parts`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/parts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -75,9 +96,13 @@ export default function InventoryPage() {
           oemNumber: formData.oemNumber || undefined,
           aftermarketNumber: formData.aftermarketNumber || undefined,
           manufacturer: formData.manufacturer || undefined,
-          supplier: formData.supplier || undefined,
+          manufacturer: formData.manufacturer || undefined,
+          supplierId: formData.supplierId || undefined,
           unitPrice: parseFloat(formData.unitPrice),
-          quantity: parseInt(formData.quantity)
+          quantity: parseInt(formData.quantity),
+          minQuantity: parseInt(formData.minQuantity),
+          barcode: formData.barcode || undefined,
+          shelfLocation: formData.shelfLocation || undefined
         })
       });
       
@@ -86,7 +111,7 @@ export default function InventoryPage() {
         setIsAddDialogOpen(false);
         setFormData({
           name: "", oemNumber: "", aftermarketNumber: "", 
-          manufacturer: "", supplier: "", unitPrice: "", quantity: "0"
+          manufacturer: "", supplierId: "", unitPrice: "", quantity: "0", minQuantity: "0", barcode: "", shelfLocation: ""
         });
         await fetchParts();
       } else {
@@ -103,7 +128,7 @@ export default function InventoryPage() {
     if (!window.confirm("Czy na pewno chcesz usunąć tę część z systemu?")) return;
     
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/parts/${id}`, { method: "DELETE" });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/parts/${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Część została usunięta.");
         setParts(parts.filter(p => p.id !== id));
@@ -123,7 +148,7 @@ export default function InventoryPage() {
     }
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/parts/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/parts/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quantity: newQuantity })
@@ -139,11 +164,12 @@ export default function InventoryPage() {
     }
   };
 
-  const filteredParts = parts.filter(p => 
+  const filteredParts = Array.isArray(parts) ? parts.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (p.oemNumber && p.oemNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (p.barcode && p.barcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (p.manufacturer && p.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ) : [];
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -188,8 +214,34 @@ export default function InventoryPage() {
                 <Input id="quantity" type="number" min="0" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="unitPrice" className="text-zinc-300">Cena jednostkowa (PLN) <span className="text-red-500">*</span></Label>
+                <Label htmlFor="minQuantity" className="text-zinc-300">Minimum alertowe</Label>
+                <Input id="minQuantity" type="number" min="0" value={formData.minQuantity} onChange={e => setFormData({...formData, minQuantity: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="unitPrice" className="text-zinc-300">Cena jedn. (PLN) <span className="text-red-500">*</span></Label>
                 <Input id="unitPrice" type="number" step="0.01" min="0" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="barcode" className="text-zinc-300">Kod kreskowy</Label>
+                <Input id="barcode" value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="Zeskanuj kod..." />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="shelfLocation" className="text-zinc-300">Regał / Półka</Label>
+                <Input id="shelfLocation" value={formData.shelfLocation} onChange={e => setFormData({...formData, shelfLocation: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="np. A1-05" />
+              </div>
+              <div className="grid gap-2 col-span-2">
+                <Label htmlFor="supplier" className="text-zinc-300">Dostawca</Label>
+                <select 
+                  id="supplier" 
+                  value={formData.supplierId} 
+                  onChange={e => setFormData({...formData, supplierId: e.target.value})} 
+                  className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Wybierz dostawcę...</option>
+                  {(Array.isArray(suppliers) ? suppliers : []).map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -248,7 +300,9 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-6 py-4">
                       {part.oemNumber ? <div className="text-zinc-300 font-mono text-xs mb-1">OEM: {part.oemNumber}</div> : null}
-                      <div className="text-xs text-zinc-500">{part.manufacturer || "Brak danych"}</div>
+                      {part.barcode ? <div className="text-zinc-400 font-mono text-xs mb-1">Kod: {part.barcode}</div> : null}
+                      {part.shelfLocation ? <div className="text-cyan-400 font-mono text-xs mb-1">Lokalizacja: {part.shelfLocation}</div> : null}
+                      <div className="text-xs text-zinc-500">{part.manufacturer || "Brak prod."} {part.supplier ? `| Dostawca: ${part.supplier.name}` : ''}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="inline-flex items-center gap-3 bg-zinc-900/50 rounded-full px-3 py-1 border border-zinc-800">

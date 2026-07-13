@@ -16,9 +16,19 @@ export default function AWSCallbackPage() {
 
   useEffect(() => {
     const code = searchParams.get("code");
+    const state = searchParams.get("state");
     
     if (!code) {
       toast.error("Brak kodu autoryzacyjnego z AWS.");
+      router.push("/login");
+      return;
+    }
+
+    const savedState = sessionStorage.getItem('aws_state');
+    const codeVerifier = sessionStorage.getItem('aws_code_verifier');
+
+    if (savedState && state !== savedState) {
+      toast.error("Nieprawidłowy stan weryfikacji (CSRF).");
       router.push("/login");
       return;
     }
@@ -28,10 +38,10 @@ export default function AWSCallbackPage() {
 
     const authenticateAWS = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:3001/auth/aws/callback`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/aws/callback`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code })
+          body: JSON.stringify({ code, codeVerifier })
         });
 
         if (response.ok) {
@@ -67,14 +77,14 @@ export default function AWSCallbackPage() {
             <span className="text-4xl text-white font-black">!</span>
           </div>
           <h1 className="text-4xl font-black text-white mb-4 uppercase tracking-wider">Odmowa Dostępu</h1>
-          <p className="text-red-200 text-lg mb-10">
-            Twój adres e-mail nie widnieje w bazie danych systemu. Nie masz uprawnień do korzystania z tej aplikacji.
+          <p className="text-red-200 text-2xl font-bold mb-10">
+            Sorry cwelu wypierdalaj
           </p>
           <button 
             onClick={() => router.push('/login')}
             className="w-full py-4 px-6 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all uppercase tracking-widest"
           >
-            Powrót do logowania
+            ok wypierdalam
           </button>
         </div>
       </div>

@@ -85,7 +85,7 @@ export default function RepairOrderProfilePage() {
 
   const fetchInventory = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/parts`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/parts`);
       if (res.ok) {
         setInventoryParts(await res.json());
       }
@@ -96,7 +96,7 @@ export default function RepairOrderProfilePage() {
 
   const fetchMechanics = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/users`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/users`);
       if (res.ok) {
         const users = await res.json();
         setMechanics(users.filter((u: any) => u.role === 'MECHANIC'));
@@ -110,14 +110,14 @@ export default function RepairOrderProfilePage() {
     fetchMechanics();
     const fetchOrder = async () => {
       try {
-        const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}`);
         if (res.ok) {
           const data = await res.json();
           
           // Check if invoice still exists in inFakt (if we have one)
           if (data.invoiceId) {
             try {
-              const checkRes = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}/invoice-check`);
+              const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/invoice-check`);
               if (checkRes.ok) {
                 const checkData = await checkRes.json();
                 if (checkData.updated) {
@@ -143,7 +143,7 @@ export default function RepairOrderProfilePage() {
     };
     const fetchAttachments = async () => {
       try {
-        const res = await fetch(`http://${window.location.hostname}:3001/attachments/entity/REPAIR_ORDER/${params.id}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/attachments/entity/REPAIR_ORDER/${params.id}`);
         if (res.ok) {
           const data = await res.json();
           setAttachments(data);
@@ -169,7 +169,7 @@ export default function RepairOrderProfilePage() {
 
     setIsUploading(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/attachments`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/attachments`, {
         method: 'POST',
         body: formData,
       });
@@ -232,7 +232,7 @@ export default function RepairOrderProfilePage() {
     }
     setIsAddingPart(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}/parts`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/parts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partId: selectedPartId, quantity: parseInt(selectedPartQuantity) })
@@ -243,7 +243,7 @@ export default function RepairOrderProfilePage() {
         setSelectedPartId("");
         setSelectedPartQuantity("1");
         // refresh order
-        const orderRes = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}`);
+        const orderRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}`);
         if (orderRes.ok) setOrder(await orderRes.json());
       } else {
         const errorData = await res.json();
@@ -259,12 +259,12 @@ export default function RepairOrderProfilePage() {
   const handleRemovePart = async (partId: string) => {
     if (!window.confirm("Czy na pewno chcesz usunąć tę część ze zlecenia? Wróci ona do magazynu.")) return;
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}/parts/${partId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/parts/${partId}`, {
         method: "DELETE"
       });
       if (res.ok) {
         toast.success("Część usunięta ze zlecenia.");
-        const orderRes = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}`);
+        const orderRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}`);
         if (orderRes.ok) setOrder(await orderRes.json());
       } else {
         toast.error("Błąd podczas usuwania części.");
@@ -279,14 +279,14 @@ export default function RepairOrderProfilePage() {
     toast.info("Pobieranie faktury...", { id: "download-invoice" });
     try {
       // Pobranie pliku z wykorzystaniem api-interceptor, który dołączy nagłówek z JWT
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}/invoice-pdf`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/invoice-pdf`);
       
       if (res.ok) {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `Faktura_${params.id.toString().substring(0,8)}.pdf`;
+        a.download = `Faktura_${String(params?.id).substring(0,8)}.pdf`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -307,7 +307,7 @@ export default function RepairOrderProfilePage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -338,7 +338,7 @@ export default function RepairOrderProfilePage() {
     if (!window.confirm("Czy na pewno chcesz zakończyć to zlecenie? Zmieni to jego status na COMPLETED.")) return;
     setIsCompleting(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -363,7 +363,7 @@ export default function RepairOrderProfilePage() {
   const handleDeleteOrder = async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -394,7 +394,7 @@ export default function RepairOrderProfilePage() {
     
     setIsGeneratingInvoice(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}/invoice`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/invoice`, {
         method: "POST",
       });
       if (res.ok) {
@@ -415,7 +415,7 @@ export default function RepairOrderProfilePage() {
   const handleUpdateInvoiceStatus = async (status: string) => {
     setIsUpdatingInvoice(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}/invoice-status`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/invoice-status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status })
@@ -493,8 +493,14 @@ export default function RepairOrderProfilePage() {
         </div>
         
         <div className="flex items-center gap-3">
+          <Link href={`/orders/${order.id}/intake`} className="border border-blue-500/30 text-blue-400 bg-transparent hover:bg-blue-500/10 hover:text-blue-300 transition-colors rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium">
+            <CheckCircle2 className="mr-2 h-4 w-4" /> Protokół
+          </Link>
+          <Link href={`/orders/${order.id}/estimates`} className="border border-amber-500/30 text-amber-400 bg-transparent hover:bg-amber-500/10 hover:text-amber-300 transition-colors rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium">
+            <FileText className="mr-2 h-4 w-4" /> Kosztorysy
+          </Link>
           <Button onClick={openEditDialog} className="border border-emerald-500/30 text-emerald-400 bg-transparent hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium">
-            <Edit className="mr-2 h-4 w-4" /> Edytuj Zlecenie
+            <Edit className="mr-2 h-4 w-4" /> Edytuj
           </Button>
           
           {(order.customer?.companyName || order.customer?.nip) && canManageInvoices && (
@@ -840,7 +846,7 @@ export default function RepairOrderProfilePage() {
             {attachments.length > 0 ? (
               attachments.map((att, idx) => (
                 <div key={idx} className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900/50 hover:border-indigo-500/50 transition-colors">
-                  <img src={`http://${window.location.hostname}:3001${att.url}`} alt={att.fileName} className="w-full h-full object-cover" />
+                  <img src={`${process.env.NEXT_PUBLIC_API_URL || ''}${att.url}`} alt={att.fileName} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
                     <span className="text-[10px] text-zinc-300 truncate">{att.fileName}</span>
                   </div>

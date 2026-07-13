@@ -1,28 +1,12 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Injectable()
-export class UsersService implements OnModuleInit {
+export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    const usersCount = await this.prisma.user.count();
-    if (usersCount === 0) {
-      console.log('No users found. Creating default admin...');
-      const passwordHash = await bcrypt.hash('admin123', 10);
-      await this.prisma.user.create({
-        data: {
-          email: 'admin@atlashc.pl',
-          passwordHash,
-          fullName: 'Admin',
-          role: 'OWNER',
-        },
-      });
-      console.log('Default admin created (admin@atlashc.pl / admin123).');
-    }
-  }
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
@@ -32,21 +16,43 @@ export class UsersService implements OnModuleInit {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
-  async findAll() {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'asc' }
-    });
+  async findAll(query?: PaginationQueryDto) {
+    const page = query?.page || 1;
+    const limit = query?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.UserWhereInput = {};
+    if (query?.search) {
+      where.OR = [
+        { email: { contains: query.search, mode: 'insensitive' } },
+        { fullName: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: query?.sortBy ? { [query.sortBy]: query.sortOrder || 'asc' } : { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
   }
 
   async create(data: Prisma.UserCreateInput) {
-    const passwordHash = data.passwordHash ? await bcrypt.hash(data.passwordHash, 10) : null;
+    const passwordHash = data.passwordHash
+      ? await bcrypt.hash(data.passwordHash, 10)
+      : null;
     return this.prisma.user.create({
       data: {
         ...data,

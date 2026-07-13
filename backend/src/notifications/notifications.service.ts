@@ -10,11 +10,15 @@ export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
   async sendEmail(to: string, subject: string, htmlContent: string) {
-    const apiKeySetting = await this.prisma.setting.findUnique({ where: { key: 'resendApiKey' } });
+    const apiKeySetting = await this.prisma.setting.findUnique({
+      where: { key: 'resendApiKey' },
+    });
     const apiKey = apiKeySetting?.value || process.env.RESEND_API_KEY;
 
     if (!apiKey) {
-      this.logger.warn(`Email simulation to ${to} (No API key). Subject: ${subject}`);
+      this.logger.warn(
+        `Email simulation to ${to} (No API key). Subject: ${subject}`,
+      );
       return;
     }
 
@@ -29,7 +33,9 @@ export class NotificationsService {
       });
 
       if (error) {
-        this.logger.error(`Resend API Error when sending to ${to}: ${error.message}`);
+        this.logger.error(
+          `Resend API Error when sending to ${to}: ${error.message}`,
+        );
         return;
       }
 
@@ -41,16 +47,26 @@ export class NotificationsService {
   }
 
   async sendSms(to: string, message: string) {
-    const sidSetting = await this.prisma.setting.findUnique({ where: { key: 'twilioAccountSid' } });
-    const tokenSetting = await this.prisma.setting.findUnique({ where: { key: 'twilioAuthToken' } });
-    const phoneSetting = await this.prisma.setting.findUnique({ where: { key: 'twilioPhoneNumber' } });
+    const sidSetting = await this.prisma.setting.findUnique({
+      where: { key: 'twilioAccountSid' },
+    });
+    const tokenSetting = await this.prisma.setting.findUnique({
+      where: { key: 'twilioAuthToken' },
+    });
+    const phoneSetting = await this.prisma.setting.findUnique({
+      where: { key: 'twilioPhoneNumber' },
+    });
 
     const twilioSid = sidSetting?.value || process.env.TWILIO_ACCOUNT_SID;
-    const twilioAuthToken = tokenSetting?.value || process.env.TWILIO_AUTH_TOKEN;
-    const twilioPhone = phoneSetting?.value || process.env.TWILIO_PHONE_NUMBER || '+1234567890';
+    const twilioAuthToken =
+      tokenSetting?.value || process.env.TWILIO_AUTH_TOKEN;
+    const twilioPhone =
+      phoneSetting?.value || process.env.TWILIO_PHONE_NUMBER || '+1234567890';
 
     if (!twilioSid || !twilioAuthToken) {
-      this.logger.warn(`SMS simulation to ${to} (No API key). Message: ${message}`);
+      this.logger.warn(
+        `SMS simulation to ${to} (No API key). Message: ${message}`,
+      );
       return;
     }
 

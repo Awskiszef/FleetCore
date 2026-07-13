@@ -5,7 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AttachmentsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { entityType: string, entityId: string, fileName: string, mimeType: string, url: string, size: number }) {
+  async create(data: {
+    entityType: string;
+    entityId: string;
+    fileName: string;
+    mimeType: string;
+    url: string;
+    size: number;
+  }) {
     return this.prisma.attachment.create({
       data,
     });
@@ -18,8 +25,16 @@ export class AttachmentsService {
         entityId,
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
+  }
+
+  async findOne(id: string) {
+    return this.prisma.attachment.findUnique({ where: { id } });
+  }
+
+  async remove(id: string) {
+    return this.prisma.attachment.delete({ where: { id } });
   }
 }

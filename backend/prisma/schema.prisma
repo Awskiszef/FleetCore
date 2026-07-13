@@ -31,10 +31,16 @@ model User {
   passwordHash String?
   fullName     String
   role         Role      @default(MECHANIC)
+  mustChangePassword Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
 
   repairOrders RepairOrder[] @relation("MechanicOrders")
+  inventoryTransactions InventoryTransaction[]
+  orderHistories RepairOrderHistory[]
+  intakesCreated VehicleIntake[]
+  estimatesCreated Estimate[]
 }
 
 model Customer {
@@ -50,6 +56,7 @@ model Customer {
   repairOrders RepairOrder[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
 
   @@index([phone])
   @@index([email])
@@ -79,6 +86,7 @@ model Vehicle {
   repairOrders     RepairOrder[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
 
   @@index([vin])
   @@index([licensePlate])
@@ -96,16 +104,22 @@ model RepairOrder {
   reportedIssue      String
   diagnosis          String?
   mechanicNotes      String?
-  estimatedCost      Float?
-  finalCost          Float?
-  laborCost          Float?
-  marginPercentage   Float?
+  estimatedCost      Decimal?          @db.Decimal(10, 2)
+  finalCost          Decimal?          @db.Decimal(10, 2)
+  laborCost          Decimal?          @db.Decimal(10, 2)
+  marginPercentage   Decimal?          @db.Decimal(5, 2)
   parts              RepairOrderPart[]
+  history            RepairOrderHistory[]
+  inventoryTransactions InventoryTransaction[]
   invoiceId          String?
   invoiceUrl         String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   completedAt        DateTime?
+  deletedAt          DateTime?
+
+  intakeProtocol     VehicleIntake?
+  estimates          Estimate[]
 
   @@index([status])
 }
@@ -117,7 +131,7 @@ model RepairOrderPart {
   partId          String
   part            Part         @relation(fields: [partId], references: [id])
   quantity        Int          @default(1)
-  priceAtUsage    Float
+  priceAtUsage    Decimal      @db.Decimal(10, 2)
   createdAt       DateTime     @default(now())
 
   @@unique([repairOrderId, partId])
@@ -129,12 +143,19 @@ model Part {
   oemNumber         String?
   aftermarketNumber String?
   manufacturer      String?
-  supplier          String?
-  unitPrice         Float
-  quantity          Int      @default(0)
+  supplierId        String?
+  supplier          Supplier? @relation(fields: [supplierId], references: [id])
+  unitPrice         Decimal   @db.Decimal(10, 2)
+  quantity          Int       @default(0)
+  reservedQuantity  Int       @default(0)
+  barcode           String?   @unique
+  shelfLocation     String?
+  minQuantity       Int       @default(0)
   repairOrders      RepairOrderPart[]
+  inventoryTransactions InventoryTransaction[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
 
   @@index([oemNumber])
   @@index([aftermarketNumber])
@@ -175,6 +196,7 @@ model FleetVehicle {
   logs         FleetVehicleLog[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
 }
 
 model FleetVehicleLog {
@@ -184,8 +206,8 @@ model FleetVehicleLog {
   date           DateTime     @default(now())
   type           FleetLogType
   mileage        Int?
-  cost           Float?
-  liters         Float?
+  cost           Decimal?     @db.Decimal(10, 2)
+  liters         Decimal?     @db.Decimal(10, 2)
   title          String
   location       String?
   policyNumber   String?
@@ -193,3 +215,129 @@ model FleetVehicleLog {
   notes          String?
   createdAt      DateTime     @default(now())
 }
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+enum InventoryTransactionType {
+  IN
+  OUT
+  RESERVE
+  UNRESERVE
+}
+
+model InventoryTransaction {
+  id            String   @id @default(uuid())
+  partId        String
+  part          Part     @relation(fields: [partId], references: [id])
+  type          InventoryTransactionType
+  quantity      Int
+  repairOrderId String?
+  repairOrder   RepairOrder? @relation(fields: [repairOrderId], references: [id])
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  @@index([partId])
+  @@index([repairOrderId])
+}
+
+model RepairOrderHistory {
+  id            String   @id @default(uuid())
+  repairOrderId String
+  repairOrder   RepairOrder @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  status        RepairOrderStatus
+  notes         String?
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([repairOrderId])
+}
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  nip         String?  @unique
+  notes       String?
+  parts       Part[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+}
+
+model VehicleIntake {
+  id              String   @id @default(uuid())
+  repairOrderId   String   @unique
+  repairOrder     RepairOrder @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  mileage         Int?
+  fuelLevel       Int?     // 0-100 percentage
+  damages         String?
+  equipment       String?
+  signatureUrl    String?
+  createdByUserId String?
+  createdByUser   User?    @relation(fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model Estimate {
+  id              String         @id @default(uuid())
+  repairOrderId   String
+  repairOrder     RepairOrder    @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  status          EstimateStatus @default(DRAFT)
+  validUntil      DateTime?
+  notes           String?
+  totalNet        Decimal        @db.Decimal(10, 2) @default(0)
+  totalGross      Decimal        @db.Decimal(10, 2) @default(0)
+  pdfUrl          String?
+  items           EstimateItem[]
+  createdByUserId String?
+  createdByUser   User?          @relation(fields: [createdByUserId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+}
+
+enum EstimateItemType {
+  PART
+  LABOR
+}
+
+model EstimateItem {
+  id         String           @id @default(uuid())
+  estimateId String
+  estimate   Estimate         @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  type       EstimateItemType
+  name       String
+  quantity   Int              @default(1)
+  unitPrice  Decimal          @db.Decimal(10, 2)
+  taxRate    Decimal          @db.Decimal(5, 2) @default(23.00)
+  totalNet   Decimal          @db.Decimal(10, 2)
+  totalGross Decimal          @db.Decimal(10, 2)
+  createdAt  DateTime         @default(now())
+}
+

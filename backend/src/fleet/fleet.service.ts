@@ -15,10 +15,10 @@ export class FleetService {
     return this.prisma.fleetVehicle.findMany({
       include: {
         logs: {
-          orderBy: { date: 'desc' }
-        }
+          orderBy: { date: 'desc' },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -27,9 +27,9 @@ export class FleetService {
       where: { id },
       include: {
         logs: {
-          orderBy: { date: 'desc' }
-        }
-      }
+          orderBy: { date: 'desc' },
+        },
+      },
     });
   }
 
@@ -47,12 +47,15 @@ export class FleetService {
   }
 
   // Logs
-  async createLog(vehicleId: string, data: Omit<Prisma.FleetVehicleLogCreateInput, 'fleetVehicle'>) {
+  async createLog(
+    vehicleId: string,
+    data: Omit<Prisma.FleetVehicleLogCreateInput, 'fleetVehicle'>,
+  ) {
     return this.prisma.fleetVehicleLog.create({
       data: {
         ...data,
-        fleetVehicle: { connect: { id: vehicleId } }
-      }
+        fleetVehicle: { connect: { id: vehicleId } },
+      },
     });
   }
 

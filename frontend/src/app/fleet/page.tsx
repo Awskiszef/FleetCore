@@ -49,7 +49,7 @@ export default function FleetPage() {
 
   const fetchVehicles = async () => {
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/fleet`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/fleet`);
       if (response.ok) {
         const data = await response.json();
         setVehicles(data);
@@ -69,7 +69,7 @@ export default function FleetPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/fleet`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/fleet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -104,7 +104,7 @@ export default function FleetPage() {
     if (!window.confirm("Czy na pewno chcesz usunąć ten pojazd ze swojej floty? Operacja jest nieodwracalna.")) return;
     
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/fleet/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/fleet/${id}`, {
         method: "DELETE",
       });
       if (response.ok) {

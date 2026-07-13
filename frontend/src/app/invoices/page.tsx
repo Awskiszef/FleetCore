@@ -21,7 +21,7 @@ export default function InvoicesPage() {
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1; // 1-12
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/invoices/list?year=${year}&month=${month}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/invoices/list?year=${year}&month=${month}`);
       if (res.ok) {
         const data = await res.json();
         setInvoices(data);
@@ -37,7 +37,7 @@ export default function InvoicesPage() {
     setDownloadingId(orderId);
     toast.info("Pobieranie faktury...", { id: "download-invoice" });
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${orderId}/invoice-pdf`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${orderId}/invoice-pdf`);
       
       if (res.ok) {
         const blob = await res.blob();

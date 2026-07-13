@@ -13,7 +13,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (token: string, user: User) => void;
+  login: (token: string, user?: User) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         // Interceptor will automatically attach token
-        const res = await fetch(`http://${window.location.hostname}:3001/auth/me`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/me`);
         if (res.ok) {
           const userData = await res.json();
           setUser(userData);
@@ -63,10 +63,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [pathname, router]);
 
-  const login = (token: string, userData: User) => {
+  const login = async (token: string, userData?: User) => {
     localStorage.setItem('token', token);
-    setUser(userData);
-    router.push('/');
+    if (userData) {
+      setUser(userData);
+      router.push('/');
+    } else {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setUser(await res.json());
+          router.push('/');
+        } else {
+          router.push('/');
+        }
+      } catch (e) {
+        router.push('/');
+      }
+    }
   };
 
   const logout = () => {

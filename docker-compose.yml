@@ -7,23 +7,29 @@ services:
     image: postgres:15-alpine
     container_name: fleetcore_db
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: SecretPassword123!
-      POSTGRES_DB: fleetcore
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SecretPassword123!}
+      POSTGRES_DB: ${POSTGRES_DB:-fleetcore}
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-fleetcore}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Backend (API w NestJS)
   backend:
     build: ./backend
     container_name: fleetcore_backend
     environment:
-      - DATABASE_URL=postgresql://admin:SecretPassword123!@db:5432/fleetcore?schema=public
+      - DATABASE_URL=${DATABASE_URL:-postgresql://admin:SecretPassword123!@db:5432/fleetcore?schema=public}
     ports:
       - "3000:3000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   # Frontend (Interfejs w Next.js)
@@ -31,7 +37,7 @@ services:
     build: ./frontend
     container_name: fleetcore_frontend
     environment:
-      - NEXT_PUBLIC_API_URL=https://api.atlashc.pl
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.atlashc.pl}
     ports:
       - "3001:3001"
     depends_on:

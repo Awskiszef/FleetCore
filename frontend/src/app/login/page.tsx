@@ -21,7 +21,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/auth/login`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -43,14 +43,27 @@ export default function LoginPage() {
 
   const handleAWSLogin = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/auth/aws/config`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/aws/config`);
       const config = await res.json();
       
       const domain = config.domain?.replace(/\/$/, '') || "https://twoja-domena.auth.eu-central-1.amazoncognito.com";
       const clientId = config.clientId || "twoj_client_id";
       const redirectUri = config.redirectUri || `http://${window.location.hostname}:3000/auth/aws/callback`;
       
-      const loginUrl = `${domain}/oauth2/authorize?client_id=${clientId}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const state = Math.random().toString(36).substring(2, 15);
+      const codeVerifier = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      const encoder = new TextEncoder();
+      const data = encoder.encode(codeVerifier);
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+      sessionStorage.setItem('aws_state', state);
+      sessionStorage.setItem('aws_code_verifier', codeVerifier);
+
+      const loginUrl = `${domain}/oauth2/authorize?client_id=${clientId}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
       
       window.location.href = loginUrl;
     } catch (e) {

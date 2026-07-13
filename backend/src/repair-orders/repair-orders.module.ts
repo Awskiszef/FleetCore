@@ -7,6 +7,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [InfaktModule, NotificationsModule],
   providers: [RepairOrdersService],
-  controllers: [RepairOrdersController]
+  controllers: [RepairOrdersController],
 })
 export class RepairOrdersModule {}

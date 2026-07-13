@@ -1,19 +1,37 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpException,
+  HttpStatus,
+  Query,
+} from '@nestjs/common';
+import { Roles } from '../auth/roles.decorator';
 import { CustomersService } from './customers.service';
-import { Prisma } from '@prisma/client';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Post()
-  create(@Body() createCustomerDto: Prisma.CustomerCreateInput) {
-    return this.customersService.create(createCustomerDto);
+  async create(@Body() createCustomerDto: CreateCustomerDto) {
+    try {
+      return await this.customersService.create(createCustomerDto as any);
+    } catch (error) {
+      throw error;
+    }
   }
 
   @Get()
-  findAll() {
-    return this.customersService.findAll();
+  async findAll(@Query() query: PaginationQueryDto) {
+    return await this.customersService.findAll(query);
   }
 
   @Get('fetch-nip/:nip')
@@ -27,11 +45,16 @@ export class CustomersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCustomerDto: Prisma.CustomerUpdateInput) {
-    return this.customersService.update(id, updateCustomerDto);
+  async update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto) {
+    try {
+      return await this.customersService.update(id, updateCustomerDto as any);
+    } catch (error) {
+      throw error;
+    }
   }
 
   @Delete(':id')
+  @Roles('OWNER', 'ADMIN')
   async remove(@Param('id') id: string) {
     try {
       return await this.customersService.remove(id);

@@ -1,53 +1,58 @@
-# FleetCore (AtlasHC Garage) - Dokumentacja Architektury i Logiki
+# FleetCore - SENS Aplikacji
 
-## 1. Wstęp
-FleetCore to zaawansowany system do zarządzania flotą pojazdów i warsztatem mechanicznym. Głównym założeniem systemu jest ścisła kontrola zasobów, uprawnień użytkowników i pełna integracja operacji warsztatowych z fakturowaniem oraz chmurowym środowiskiem AWS.
+## 1. Cel i przeznaczenie aplikacji
+FleetCore (AtlasHC Garage) to zaawansowana aplikacja webowa do kompleksowego zarządzania warsztatem samochodowym i flotą pojazdów. 
 
-## 2. Stos Technologiczny
-- **Frontend**: Next.js 15 (React), Tailwind CSS, shadcn/ui, Lucide Icons, Fetch API Interceptor
-- **Backend**: NestJS, Prisma ORM
-- **Baza danych**: PostgreSQL
-- **Bezpieczeństwo**: JWT (JSON Web Tokens), bcrypt
-- **Integracje Zewnętrzne**: AWS Cognito SSO, InFakt (Faktury)
+### Kluczowe moduły:
+- **Flota i Pojazdy:** Zarządzanie przypisaniami pojazdów do klientów, historia napraw, dekodowanie VIN.
+- **Klienci:** Baza klientów, powiązane z nimi pojazdy i zlecenia.
+- **Zlecenia Naprawy (Repair Orders):** Cykl życia zlecenia od przyjęcia do wydania, kosztorysy, marże, części, koszty robocizny.
+- **Magazyn Części:** Stany magazynowe, progi alertów.
+- **Faktury i Rozliczenia:** Integracja z Infakt, generowanie i pobieranie faktur PDF.
+- **Role i Uprawnienia (RBAC):** `OWNER`, `ADMIN`, `MECHANIC`, `RECEPTIONIST`. Różne poziomy dostępu do funkcji.
 
-## 3. Struktura Aplikacji
-- **Klienci (`/customers`)**: Zarządzanie bazą podmiotów i klientów warsztatu.
-- **Pojazdy (`/vehicles` & `/fleet`)**: Zarządzanie flotą pojazdów, przypisywanie do klientów, bezpieczne wgrywanie załączników (autoryzowane requesty fetch zamiast linków bezpośrednich).
-- **Zlecenia napraw (`/orders`)**: Tworzenie i śledzenie zleceń warsztatowych, wyceny, przypisywanie mechaników.
-- **Faktury (`/invoices`)**: Bezpośrednie wystawianie faktur (InFakt API) oraz ich pobieranie jako autoryzowane pliki Blob.
-- **Ustawienia (`/settings`)**: Dynamiczna konfiguracja usług zewnętrznych (API, AWS) z poziomu interfejsu. Wartości przechowywane są w tabeli `Setting` w bazie bez konieczności ciągłej modyfikacji pliku `.env`.
+## 2. Architektura Systemu
+- **Frontend:** Next.js 14, React, TailwindCSS, Lucide Icons, Shadcn UI. Aplikacja w pełni responsywna, z trybem Dark Mode ("cyber-punkowym" designem).
+- **Backend:** NestJS, TypeScript, Prisma ORM, PostgreSQL. Architektura modułowa, Rest API.
+- **Infrastruktura / Bezpieczeństwo:** 
+  - Hashowanie haseł (bcrypt), JWT.
+  - Walidacja danych (class-validator, DTO).
+  - Throttling (Rate Limit), CORS, maskowanie sekretów, logi audytowe dla ustawień.
+  - Szyfrowane załączniki (lokalne bezpieczne pobieranie).
 
-## 4. System Ról i Uprawnień (RBAC)
-Role w systemie są precyzyjnie przypisane do odpowiednich procesów w warsztacie:
-- `OWNER` / `ADMIN`: Pełny dostęp do całego systemu (wystawianie faktur, ustawienia, pracownicy, floty).
-- `RECEPTIONIST` (Sekretariat/Recepcja): 
-  - Dozwolone: Dodawanie zleceń naprawy, wystawianie i pobieranie faktur. 
-  - Zabronione: Modyfikacja bazy samych pojazdów we flocie oraz brak dostępu do magazynu.
-- `MECHANIC` (Mechanik):
-  - Dozwolone: Aktualizacja statusów zleceń napraw w przypisanych zadaniach.
-  - Zabronione: Wystawianie faktur, przeglądanie panelu ustawień, dostęp do zarządzania pracownikami.
+## 3. Implementacja logowania z AWS SSO (Cognito)
 
-Uprawnienia są egzekwowane na poziomie frontendu (globalny stan `AuthContext` filtrujący renderowanie bloków bocznego paska nawigacyjnego i stron) oraz autoryzowane na backendzie (walidacja JWT w żądaniach punktów końcowych).
+### Cel integracji:
+Umożliwienie administratorom oraz pracownikom posiadającym konta w AWS IAM Identity Center bezhasłowego, bezpiecznego dostępu do panelu warsztatu.
 
-## 5. Logowanie przez AWS Cognito (IAM Identity Center / SSO)
+### Jak to działa (Flow OAuth 2.0 PKCE):
 
-System używa hybrydowego logowania: standardowe (email + hasło zapisane w `bcrypt`) oraz bezhasłowe korporacyjne logowanie oparte o chmurę AWS (OAuth2 *Authorization Code Grant*).
+1. **Konfiguracja na Backendzie:**
+   - W sekcji Ustawienia (dostępnej tylko dla `OWNER`) zapisywane są (w formie zaszyfrowanej) parametry:
+     - `awsCognitoDomain`
+     - `awsCognitoClientId`
+     - `awsCognitoClientSecret`
+     - `awsCognitoRedirectUri`
+2. **Logowanie na Frontendzie (`/login`):**
+   - Po kliknięciu "Zaloguj przez AWS IAM (SSO)", frontend wykonuje `GET /auth/aws/config` by pobrać jawną część konfiguracji (domenę, clientId).
+   - Frontend generuje bezpieczny losowy ciąg znaków (PKCE `code_verifier`) i jego hash (`code_challenge`), oraz `state` w celu zapobiegania atakom CSRF.
+   - Użytkownik jest przekierowywany na stronę logowania AWS Cognito z dołączonym `code_challenge` i `state`.
+3. **Powrót do aplikacji (`/auth/aws/callback`):**
+   - AWS przekierowuje użytkownika pod adres callbacku z parametrem `code` oraz `state`.
+   - Frontend weryfikuje czy `state` się zgadza z zapisanym w `sessionStorage`.
+   - Frontend wysyła `code` oraz swój `code_verifier` (PKCE) do serwera: `POST /auth/aws/callback`.
+4. **Weryfikacja i Autoryzacja po stronie Backendu:**
+   - Backend wysyła zapytanie do `https://<DOMENA_COGNITO>/oauth2/token`, przekazując `code`, `client_secret` oraz `code_verifier` (PKCE).
+   - W zamian otrzymuje m.in. `id_token`.
+   - Backend **bezpiecznie weryfikuje** kryptograficzny podpis `id_token` (algorytm RS256) przy użyciu publicznych kluczy AWS z endpointu `/.well-known/jwks.json` wykorzystując bibliotekę `jwks-rsa`. Weryfikuje także `issuer` oraz `audience`.
+   - Po udanej weryfikacji tokenu, z tokena wyciągany jest adres e-mail pracownika.
+5. **Logowanie do systemu:**
+   - Backend sprawdza, czy e-mail istnieje w bazie lokalnych użytkowników.
+   - **Brak użytkownika w bazie:** Rzucany jest wyjątek `UnauthorizedException`. Frontend wyświetla dedykowany, agresywny komunikat blokady na cały ekran ("Sorry cwelu wypierdalaj").
+   - **Użytkownik istnieje:** Backend generuje lokalny token JWT podpisany własnym sekretem (`JWT_SECRET`) i zwraca go do frontendu, tak jakby to było standardowe logowanie.
 
-### A. Dynamiczna Konfiguracja AWS
-Parametry z AWS (Domain, Client ID, Client Secret, Redirect URI) aplikacja pobiera przez globalny punkt `GET /auth/aws/config`. Parametry te można wygodnie zmieniać w zakładce **Ustawienia Systemu** w samej aplikacji. Odświeżane są w czasie rzeczywistym.
-
-### B. Przebieg autoryzacji AWS:
-1. **Inicjacja (Frontend)**: Użytkownik w `/login` klika guzik "AWS IAM (SSO)". Skrypt dynamicznie skleja URL przekierowujący na adres AWS Cognito Endpoint. Skonfigurowane są specjalne `scope: email + openid`, tak by zgadzało się to idealnie z ustawieniami "App Client" w środowisku Cloud.
-2. **Przekierowanie**: Użytkownik loguje się po stronie serwera Amazona (`Managed Login Page`).
-3. **Powrót (Callback)**: AWS przekierowuje sesję z powrotem do naszego Frontendu pod adres publiczny `http://127.0.0.1:3000/auth/aws/callback?code=[KOD]`. 
-4. **Wymiana Kodu (Backend)**: 
-   - Frontend wysyła kod jednorazowy `POST`-em na nasz własny backend (`/auth/aws/callback`).
-   - NestJS bezpiecznie wykonuje zapytanie serwer-serwer do AWS (`oauth2/token`), przesyłając sekret. 
-   - AWS wystawia poświadczony certyfikatem plik `id_token` typu JWT zawierający maila użytkownika.
-5. **Polityka Bezpieczeństwa w Backendzie (Weryfikacja Konta)**:
-   - Backend dekoduje token i z wyciągniętym adresem e-mail przeszukuje własną tabelę PostgreSQL `User`.
-   - **Gdy brak użytkownika w bazie**: Zapytanie od razu odrzucane jest poprzez jawnie rzucony błąd `UnauthorizedException('Brak dostępu...')`. Blokowana jest rejestracja osób z zewnątrz, których wcześniej właściciel/administrator nie wpisał do rejestru kadrowego FleetCore.
-   - **Gdy użytkownik istnieje**: Backend wystawia wewnętrzny aplikacyjny token FleetCore dla pracownika, pozwalając mu na obsługę zadań.
-6. **Agresywna Blokada na Froncie**:
-   - Ścieżka callback w `AuthContext` jest zwolniona z wymogu logowania. 
-   - Jeśli backend zablokował logowanie, rzucony Exception jest przechwytywany i zamiast powiadomienia w rogu, użytkownik ląduje na zaporowej, agresywno-czerwonej warstwie pełnoekranowej informującej wprost o absolutnym braku uprawnień (brak e-maila w bazie firmowej). Użytkownik może wyłącznie cofnąć się na stronę logowania podstawowego.
+### Zabezpieczenia AWS Login:
+- Używamy PKCE, by chronić proces wymiany kodu na token przed przechwyceniem.
+- Token jest weryfikowany w oparciu o klucze JWKS (żadne fałszywe lub modyfikowane tokeny nie przejdą weryfikacji).
+- Zastosowano stan weryfikacji (CSRF protection).
+- Dane dostępowe (Client Secret) są szyfrowane na poziomie bazy danych i nigdy nie wyciekają do frontendu.

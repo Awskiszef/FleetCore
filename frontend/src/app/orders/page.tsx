@@ -59,7 +59,7 @@ export default function RepairOrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/repair-orders`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders`);
       if (response.ok) {
         const data = await response.json();
         setOrders(data);
@@ -76,8 +76,8 @@ export default function RepairOrdersPage() {
   const fetchDropdownData = async () => {
     try {
       const [cRes, vRes] = await Promise.all([
-        fetch(`http://${window.location.hostname}:3001/customers`),
-        fetch(`http://${window.location.hostname}:3001/vehicles`)
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/vehicles`)
       ]);
       if (cRes.ok && vRes.ok) {
         const customers = await cRes.json();
@@ -122,7 +122,7 @@ export default function RepairOrdersPage() {
     
     setIsSubmitting(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/repair-orders`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

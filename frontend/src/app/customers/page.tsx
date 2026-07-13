@@ -42,7 +42,7 @@ export default function CustomersPage() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/customers`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers`);
       if (response.ok) {
         const data = await response.json();
         setCustomers(data);
@@ -69,7 +69,7 @@ export default function CustomersPage() {
     
     setIsFetchingNip(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/customers/fetch-nip/${formData.nip.replace(/\D/g, '')}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers/fetch-nip/${formData.nip.replace(/\D/g, '')}`);
       if (response.ok) {
         const data = await response.json();
         setFormData(prev => ({
@@ -94,7 +94,7 @@ export default function CustomersPage() {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/customers`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

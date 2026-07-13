@@ -49,7 +49,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:3001/settings`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/settings`);
         if (response.ok) {
           const data = await response.json();
           setCompanyData({
@@ -90,7 +90,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/settings`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

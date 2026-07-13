@@ -12,25 +12,25 @@ export class DashboardService {
     // Aktywne zlecenia
     const activeOrders = await this.prisma.repairOrder.count({
       where: {
-        status: { not: 'COMPLETED' }
-      }
+        status: { not: 'COMPLETED' },
+      },
     });
 
     // Pojazdy w warsztacie (unikalne vehicleId dla aktywnych zleceń)
     const activeOrdersList = await this.prisma.repairOrder.findMany({
       where: {
-        status: { not: 'COMPLETED' }
+        status: { not: 'COMPLETED' },
       },
-      select: { vehicleId: true }
+      select: { vehicleId: true },
     });
-    const uniqueVehicles = new Set(activeOrdersList.map(o => o.vehicleId));
+    const uniqueVehicles = new Set(activeOrdersList.map((o) => o.vehicleId));
     const vehiclesInShop = uniqueVehicles.size;
 
     // Nowi klienci w tym miesiącu
     const newCustomers = await this.prisma.customer.count({
       where: {
-        createdAt: { gte: startOfMonth }
-      }
+        createdAt: { gte: startOfMonth },
+      },
     });
 
     // Przychód w tym miesiącu (sum of finalCost)
@@ -38,11 +38,14 @@ export class DashboardService {
       where: {
         status: 'COMPLETED',
         completedAt: { gte: startOfMonth },
-        finalCost: { not: null }
+        finalCost: { not: null },
       },
-      select: { finalCost: true }
+      select: { finalCost: true },
     });
-    const monthlyRevenue = completedOrdersThisMonth.reduce((sum, order) => sum + (order.finalCost || 0), 0);
+    const monthlyRevenue = completedOrdersThisMonth.reduce(
+      (sum, order) => sum + Number(order.finalCost || 0),
+      0,
+    );
 
     // Ostatnia aktywność (5 ostatnich zleceń)
     const recentActivity = await this.prisma.repairOrder.findMany({
@@ -50,8 +53,8 @@ export class DashboardService {
       orderBy: { updatedAt: 'desc' },
       include: {
         customer: true,
-        vehicle: true
-      }
+        vehicle: true,
+      },
     });
 
     return {
@@ -59,13 +62,15 @@ export class DashboardService {
       vehiclesInShop,
       newCustomers,
       monthlyRevenue,
-      recentActivity: recentActivity.map(order => ({
+      recentActivity: recentActivity.map((order) => ({
         id: order.id,
-        title: order.vehicle ? `${order.vehicle.make} ${order.vehicle.model}` : 'Zlecenie naprawy',
+        title: order.vehicle
+          ? `${order.vehicle.make} ${order.vehicle.model}`
+          : 'Zlecenie naprawy',
         customer: order.customer?.fullName || 'Nieznany klient',
         status: order.status,
         time: order.updatedAt,
-      }))
+      })),
     };
   }
 }
