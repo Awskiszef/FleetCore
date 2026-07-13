@@ -161,15 +161,21 @@ model Part {
   @@index([aftermarketNumber])
 }
 
+enum AttachmentEntityType {
+  VEHICLE
+  REPAIR_ORDER
+  CUSTOMER
+}
+
 model Attachment {
-  id         String   @id @default(uuid())
-  entityType String
-  entityId   String
-  fileName   String
-  mimeType   String
-  url        String
-  size       Int
-  createdAt  DateTime @default(now())
+  id               String               @id @default(uuid())
+  entityType       AttachmentEntityType
+  entityId         String
+  originalFileName String
+  storedFileName   String
+  mimeType         String
+  size             Int
+  createdAt        DateTime             @default(now())
 }
 
 model Setting {

@@ -4,6 +4,10 @@ import { AttachmentsService } from './attachments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HttpException } from '@nestjs/common';
 
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { FILE_STORAGE } from './storage.service';
+
 describe('AttachmentsController', () => {
   let controller: AttachmentsController;
   let service: AttachmentsService;
@@ -25,8 +29,22 @@ describe('AttachmentsController', () => {
           provide: PrismaService,
           useValue: {},
         },
+        {
+          provide: FILE_STORAGE,
+          useValue: {
+            save: jest.fn(),
+            open: jest.fn(),
+            delete: jest.fn(),
+            exists: jest.fn(),
+          },
+        },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AttachmentsController>(AttachmentsController);
     service = module.get<AttachmentsService>(AttachmentsService);

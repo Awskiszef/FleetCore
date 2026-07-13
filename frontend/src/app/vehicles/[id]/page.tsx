@@ -545,14 +545,17 @@ export default function VehicleProfilePage() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
             {attachments.length > 0 ? (
-              attachments.map((att, idx) => (
-                <div key={idx} className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900/50 hover:border-purple-500/50 transition-colors">
-                  <img src={`${process.env.NEXT_PUBLIC_API_URL || ''}${att.url}`} alt={att.fileName} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
-                    <span className="text-[10px] text-zinc-300 truncate">{att.fileName}</span>
+              attachments.map((att, idx) => {
+                const isImage = att.mimeType?.startsWith('image/');
+                return (
+                  <div key={idx} className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900/50 hover:border-purple-500/50 transition-colors flex items-center justify-center">
+                    <AttachmentPreview id={att.id} alt={att.originalFileName || att.fileName} isImage={isImage} />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+                      <span className="text-[10px] text-zinc-300 truncate">{att.originalFileName || att.fileName}</span>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="col-span-full py-12 text-center text-zinc-500 flex flex-col items-center">
                 <ImageIcon className="w-12 h-12 mb-3 opacity-20" />
@@ -564,5 +567,48 @@ export default function VehicleProfilePage() {
         </GlassCard>
       </div>
     </div>
+  );
+}
+
+function AttachmentPreview({ id, alt, isImage }: { id: string; alt: string; isImage: boolean }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string;
+    const fetchContent = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/attachments/${id}/content`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          objectUrl = URL.createObjectURL(blob);
+          setSrc(objectUrl);
+        }
+      } catch (e) {
+        console.error('Failed to load attachment content', e);
+      }
+    };
+    fetchContent();
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [id]);
+
+  if (!src) {
+    return <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />;
+  }
+
+  if (isImage) {
+    return <img src={src} alt={alt} className="w-full h-full object-cover" />;
+  }
+
+  return (
+    <a href={src} download={alt} className="flex flex-col items-center justify-center text-zinc-400 hover:text-purple-400">
+      <FileText className="w-10 h-10 mb-2" />
+      <span className="text-xs">Pobierz dokument</span>
+    </a>
   );
 }

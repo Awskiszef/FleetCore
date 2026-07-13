@@ -1,16 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { FILE_STORAGE, FileStorage } from './storage.service';
+import { AttachmentEntityType } from '@prisma/client';
 
 @Injectable()
 export class AttachmentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(FILE_STORAGE) private storage: FileStorage,
+  ) {}
 
   async create(data: {
-    entityType: string;
+    entityType: AttachmentEntityType;
     entityId: string;
-    fileName: string;
+    originalFileName: string;
+    storedFileName: string;
     mimeType: string;
-    url: string;
     size: number;
   }) {
     return this.prisma.attachment.create({
@@ -18,7 +23,7 @@ export class AttachmentsService {
     });
   }
 
-  async findByEntity(entityType: string, entityId: string) {
+  async findByEntity(entityType: AttachmentEntityType, entityId: string) {
     return this.prisma.attachment.findMany({
       where: {
         entityType,
@@ -35,6 +40,14 @@ export class AttachmentsService {
   }
 
   async remove(id: string) {
+    const attachment = await this.findOne(id);
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    // Usuń plik ze storage
+    await this.storage.delete(attachment.storedFileName);
+
     return this.prisma.attachment.delete({ where: { id } });
   }
 }

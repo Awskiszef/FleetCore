@@ -10,36 +10,58 @@ import {
   Res,
   HttpException,
   HttpStatus,
+  UseGuards,
+  Inject,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AttachmentsService } from './attachments.service';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import * as fs from 'fs';
-import { createReadStream } from 'fs';
+import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { Roles } from '../auth/roles.decorator';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { FILE_STORAGE, FileStorage } from './storage.service';
+import { AttachmentEntityType } from '@prisma/client';
+import { extname } from 'path';
 
+function checkMagicBytes(buffer: Buffer, mimeType: string): boolean {
+  if (buffer.length < 4) return false;
+
+  const hex = buffer.toString('hex', 0, 8).toUpperCase();
+
+  switch (mimeType) {
+    case 'image/jpeg':
+      return hex.startsWith('FFD8FF');
+    case 'image/png':
+      return hex.startsWith('89504E470D0A1A0A');
+    case 'application/pdf':
+      return hex.startsWith('25504446'); // %PDF
+    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      // docx, zip
+      return hex.startsWith('504B0304');
+    case 'application/msword':
+      // old doc
+      return hex.startsWith('D0CF11E0A1B11AE1');
+    default:
+      return false;
+  }
+}
+
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('attachments')
 export class AttachmentsController {
   constructor(
     private readonly attachmentsService: AttachmentsService,
     private readonly prisma: PrismaService,
+    @Inject(FILE_STORAGE) private storage: FileStorage,
   ) {}
 
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          cb(null, `${uniqueSuffix}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         const allowedMimeTypes = [
@@ -58,77 +80,87 @@ export class AttachmentsController {
   )
   async create(
     @UploadedFile() file: Express.Multer.File,
-    @Body('entityType') entityType: string,
+    @Body('entityType') entityType: AttachmentEntityType,
     @Body('entityId') entityId: string,
   ) {
     if (!file) {
-      throw new Error('No file uploaded');
+      throw new BadRequestException('No file uploaded');
     }
 
-    let customerFolder = 'common';
+    // Walidacja Magic Bytes
+    if (!checkMagicBytes(file.buffer, file.mimetype)) {
+      throw new BadRequestException(
+        'Nieprawidłowa zawartość pliku (magic bytes mismatch)',
+      );
+    }
 
-    if (entityType === 'VEHICLE') {
+    // Walidacja czy obiekt istnieje
+    if (entityType === AttachmentEntityType.VEHICLE) {
       const vehicle = await this.prisma.vehicle.findUnique({
         where: { id: entityId },
       });
-      if (vehicle && vehicle.customerId) {
-        customerFolder = vehicle.customerId;
-      }
-    } else if (entityType === 'REPAIR_ORDER') {
+      if (!vehicle) throw new BadRequestException('Vehicle not found');
+    } else if (entityType === AttachmentEntityType.REPAIR_ORDER) {
       const order = await this.prisma.repairOrder.findUnique({
         where: { id: entityId },
       });
-      if (order && order.customerId) {
-        customerFolder = order.customerId;
-      }
+      if (!order) throw new BadRequestException('RepairOrder not found');
+    } else if (entityType === AttachmentEntityType.CUSTOMER) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: entityId },
+      });
+      if (!customer) throw new BadRequestException('Customer not found');
+    } else {
+      throw new BadRequestException('Invalid entityType');
     }
 
-    const customerDir = join(process.cwd(), 'uploads', customerFolder);
-    if (!fs.existsSync(customerDir)) {
-      fs.mkdirSync(customerDir, { recursive: true });
-    }
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = extname(file.originalname);
+    const storedFileName = `${entityType.toLowerCase()}_${entityId}_${uniqueSuffix}${ext}`;
 
-    const newFilePath = join(customerDir, file.filename);
-    fs.renameSync(file.path, newFilePath);
+    await this.storage.save(file, storedFileName);
 
     return this.attachmentsService.create({
       entityType,
       entityId,
-      fileName: file.filename,
+      originalFileName: file.originalname,
+      storedFileName,
       mimeType: file.mimetype,
-      url: `/uploads/${customerFolder}/${file.filename}`,
       size: file.size,
     });
   }
 
   @Get('entity/:entityType/:entityId')
   findByEntity(
-    @Param('entityType') entityType: string,
+    @Param('entityType') entityType: AttachmentEntityType,
     @Param('entityId') entityId: string,
   ) {
     return this.attachmentsService.findByEntity(entityType, entityId);
   }
 
-  @Get('download/:id')
+  @Get(':id/content')
   async download(@Param('id') id: string, @Res() res: Response) {
     const attachment = await this.attachmentsService.findOne(id);
-    if (!attachment)
+    if (!attachment) {
       throw new HttpException('Plik nie istnieje', HttpStatus.NOT_FOUND);
+    }
 
-    const filePath = join(process.cwd(), attachment.url);
-    if (!fs.existsSync(filePath)) {
+    const fileExists = await this.storage.exists(attachment.storedFileName);
+    if (!fileExists) {
       throw new HttpException(
         'Plik nie istnieje na dysku',
         HttpStatus.NOT_FOUND,
       );
     }
 
-    const file = createReadStream(filePath);
+    const stream = await this.storage.open(attachment.storedFileName);
+
     res.set({
       'Content-Type': attachment.mimeType,
-      'Content-Disposition': `attachment; filename="${attachment.fileName}"`,
+      'Content-Disposition': `inline; filename="${attachment.originalFileName}"`,
     });
-    file.pipe(res);
+
+    stream.pipe(res);
   }
 
   @Delete(':id')
