@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface RepairOrder {
   id: string;
@@ -22,6 +23,8 @@ interface RepairOrder {
   laborCost?: number;
   marginPercentage?: number;
   createdAt: string;
+  assignedMechanicId?: string;
+  assignedMechanic?: { id: string; fullName: string };
   customer?: { id: string; fullName: string; phone?: string; companyName?: string; nip?: string };
   vehicle?: { id: string; make: string; model: string; licensePlate: string; vin: string };
   invoiceId?: string;
@@ -35,6 +38,10 @@ interface RepairOrder {
 }
 
 export default function RepairOrderProfilePage() {
+  const { user } = useAuth();
+  const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
+  const canManageInvoices = isAdminOrOwner || user?.role === 'RECEPTIONIST';
+  
   const params = useParams();
   const router = useRouter();
   const [order, setOrder] = useState<RepairOrder | null>(null);
@@ -53,6 +60,7 @@ export default function RepairOrderProfilePage() {
   // Invoice State
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
 
   const [editForm, setEditForm] = useState({
     status: "",
@@ -62,8 +70,11 @@ export default function RepairOrderProfilePage() {
     estimatedCost: "",
     finalCost: "",
     laborCost: "",
-    marginPercentage: ""
+    marginPercentage: "",
+    assignedMechanicId: ""
   });
+
+  const [mechanics, setMechanics] = useState<any[]>([]);
 
   // Parts logic
   const [isPartDialogOpen, setIsPartDialogOpen] = useState(false);
@@ -83,7 +94,20 @@ export default function RepairOrderProfilePage() {
     }
   };
 
+  const fetchMechanics = async () => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/users`);
+      if (res.ok) {
+        const users = await res.json();
+        setMechanics(users.filter((u: any) => u.role === 'MECHANIC'));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
+    fetchMechanics();
     const fetchOrder = async () => {
       try {
         const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}`);
@@ -145,7 +169,7 @@ export default function RepairOrderProfilePage() {
 
     setIsUploading(true);
     try {
-      const res = await fetch('http://localhost:3001/attachments', {
+      const res = await fetch(`http://${window.location.hostname}:3001/attachments`, {
         method: 'POST',
         body: formData,
       });
@@ -175,7 +199,8 @@ export default function RepairOrderProfilePage() {
         estimatedCost: order.estimatedCost?.toString() || "",
         finalCost: order.finalCost?.toString() || "",
         laborCost: order.laborCost?.toString() || "",
-        marginPercentage: order.marginPercentage?.toString() || ""
+        marginPercentage: order.marginPercentage?.toString() || "",
+        assignedMechanicId: order.assignedMechanicId || ""
       });
       setIsEditDialogOpen(true);
     }
@@ -249,6 +274,35 @@ export default function RepairOrderProfilePage() {
     }
   };
 
+  const handleDownloadInvoice = async () => {
+    setIsDownloadingInvoice(true);
+    toast.info("Pobieranie faktury...", { id: "download-invoice" });
+    try {
+      // Pobranie pliku z wykorzystaniem api-interceptor, który dołączy nagłówek z JWT
+      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${params.id}/invoice-pdf`);
+      
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Faktura_${params.id.toString().substring(0,8)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success("Faktura pobrana.", { id: "download-invoice" });
+      } else {
+        toast.error("Nie udało się pobrać faktury. Serwer odrzucił żądanie.", { id: "download-invoice" });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Błąd połączenia podczas pobierania faktury.", { id: "download-invoice" });
+    } finally {
+      setIsDownloadingInvoice(false);
+    }
+  };
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -262,6 +316,7 @@ export default function RepairOrderProfilePage() {
           finalCost: editForm.finalCost !== "" ? parseFloat(editForm.finalCost) : null,
           laborCost: editForm.laborCost !== "" ? parseFloat(editForm.laborCost) : null,
           marginPercentage: editForm.marginPercentage !== "" ? parseFloat(editForm.marginPercentage) : null,
+          assignedMechanicId: editForm.assignedMechanicId || null,
         }),
       });
       if (res.ok) {
@@ -442,7 +497,7 @@ export default function RepairOrderProfilePage() {
             <Edit className="mr-2 h-4 w-4" /> Edytuj Zlecenie
           </Button>
           
-          {(order.customer?.companyName || order.customer?.nip) && (
+          {(order.customer?.companyName || order.customer?.nip) && canManageInvoices && (
             order.invoiceId ? (
               <div className="flex items-center gap-2">
                 <select 
@@ -456,9 +511,10 @@ export default function RepairOrderProfilePage() {
                   <option value="printed">Do zapłaty (Wystawiona)</option>
                   <option value="paid">Opłacona</option>
                 </select>
-                <a href={`http://${window.location.hostname}:3001/repair-orders/${params.id}/invoice-pdf`} target="_blank" rel="noreferrer" className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium shadow-lg shadow-indigo-500/20 transition-colors border-0 cursor-pointer">
-                  <Download className="mr-2 h-4 w-4" /> Pobierz Fakturę
-                </a>
+                <Button onClick={handleDownloadInvoice} disabled={isDownloadingInvoice} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium shadow-lg shadow-indigo-500/20 transition-colors border-0">
+                  {isDownloadingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                  {isDownloadingInvoice ? "Pobieranie..." : "Pobierz Fakturę"}
+                </Button>
               </div>
             ) : (
               <Button onClick={handleGenerateInvoice} disabled={isGeneratingInvoice} className="bg-indigo-600/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium transition-colors">
@@ -468,9 +524,11 @@ export default function RepairOrderProfilePage() {
             )
           )}
 
-          <Button onClick={() => setIsDeleteDialogOpen(true)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full px-4 h-9 transition-all border border-red-500/20 inline-flex items-center justify-center">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {isAdminOrOwner && (
+            <Button onClick={() => setIsDeleteDialogOpen(true)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full px-4 h-9 transition-all border border-red-500/20 inline-flex items-center justify-center">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
           {order.status !== "COMPLETED" && (
             <Button onClick={handleCompleteOrder} disabled={isCompleting} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium shadow-lg shadow-emerald-500/20 transition-colors border-0">
               <CheckCircle2 className="mr-2 h-4 w-4" /> {isCompleting ? "Zakańczanie..." : "Zakończ Naprawę"}
@@ -513,6 +571,15 @@ export default function RepairOrderProfilePage() {
                 <option value="DIAGNOSING">DIAGNOSTYKA (DIAGNOSING)</option>
                 <option value="REPAIRING">W TRAKCIE NAPRAWY (REPAIRING)</option>
                 <option value="COMPLETED">ZAKOŃCZONE (COMPLETED)</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="assignedMechanicId" className="text-zinc-300">Przypisany Mechanik</Label>
+              <select id="assignedMechanicId" value={editForm.assignedMechanicId} onChange={e => setEditForm({...editForm, assignedMechanicId: e.target.value})} className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500">
+                <option value="">-- Brak / Nieprzypisany --</option>
+                {mechanics.map(m => (
+                  <option key={m.id} value={m.id}>{m.fullName}</option>
+                ))}
               </select>
             </div>
             <div className="grid gap-2">
@@ -601,12 +668,31 @@ export default function RepairOrderProfilePage() {
                   <span className="text-sm text-zinc-500">Telefon:</span>
                   <span className="font-medium text-zinc-200">{order.customer.phone || "Brak"}</span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-500">NIP:</span>
+                  <span className="font-mono text-zinc-400 text-xs">{order.customer.nip || "-"}</span>
+                </div>
                 <Link href={`/customers/${order.customer.id}`} className="text-sm text-emerald-400 hover:underline mt-2 inline-flex items-center">
                   Zobacz profil klienta &rarr;
                 </Link>
               </div>
             ) : (
               <div className="text-zinc-500 italic mt-2">Brak przypisanego klienta.</div>
+            )}
+          </GlassCard>
+
+          {/* Mechanik Card */}
+          <GlassCard className="flex flex-col gap-4 border-l-4 border-l-amber-500">
+            <h2 className="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-2 flex items-center gap-2">
+              <User className="w-5 h-5 text-amber-500" /> Przypisany Mechanik
+            </h2>
+            
+            {order.assignedMechanic ? (
+              <div className="flex flex-col gap-3 mt-2">
+                <div className="font-bold text-zinc-100 text-lg">{order.assignedMechanic.fullName}</div>
+              </div>
+            ) : (
+              <div className="text-zinc-500 italic mt-2">Brak przypisanego mechanika.</div>
             )}
           </GlassCard>
 

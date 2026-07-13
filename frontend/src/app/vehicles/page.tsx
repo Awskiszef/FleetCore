@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Vehicle {
   id: string;
@@ -25,6 +26,9 @@ interface CustomerOption {
 }
 
 export default function VehiclesPage() {
+  const { user } = useAuth();
+  const canAddVehicle = user?.role === 'ADMIN' || user?.role === 'OWNER';
+
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -181,9 +185,11 @@ export default function VehiclesPage() {
           <p className="text-zinc-400 mt-2 text-lg">Zarządzaj pojazdami klientów w Twoim warsztacie.</p>
         </div>
         
-        <Button onClick={openAddDialog} className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white font-medium shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
-          <Plus className="mr-2 h-4 w-4" /> Nowy Pojazd
-        </Button>
+        {canAddVehicle && (
+          <Button onClick={openAddDialog} className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white font-medium shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
+            <Plus className="mr-2 h-4 w-4" /> Nowy Pojazd
+          </Button>
+        )}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-[425px]">
             <DialogHeader>

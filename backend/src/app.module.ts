@@ -13,6 +13,10 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
 import { FleetModule } from './fleet/fleet.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/jwt.guard';
 
 @Module({
   imports: [
@@ -29,9 +33,17 @@ import { FleetModule } from './fleet/fleet.module';
     DashboardModule,
     NotificationsModule,
     SettingsModule,
-    FleetModule
+    FleetModule,
+    UsersModule,
+    AuthModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

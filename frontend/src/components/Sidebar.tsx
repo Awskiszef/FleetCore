@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Car, Wrench, Package, Settings, Receipt, CarFront } from "lucide-react";
+import { LayoutDashboard, Users, Car, Wrench, Package, Settings, Receipt, CarFront, ShieldAlert } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   const links = [
     { href: "/", label: "Pulpit", icon: LayoutDashboard },
@@ -14,9 +16,16 @@ export function Sidebar() {
     { href: "/customers", label: "Klienci", icon: Users },
     { href: "/vehicles", label: "Pojazdy", icon: Car },
     { href: "/fleet", label: "Moje Auta", icon: CarFront },
-    { href: "/inventory", label: "Magazyn", icon: Package },
-    { href: "/settings", label: "Ustawienia", icon: Settings },
   ];
+
+  if (user?.role !== "RECEPTIONIST") {
+    links.push({ href: "/inventory", label: "Magazyn", icon: Package });
+  }
+
+  if (user?.role === "ADMIN" || user?.role === "OWNER") {
+    links.push({ href: "/team", label: "Zespół", icon: ShieldAlert });
+    links.push({ href: "/settings", label: "Ustawienia", icon: Settings });
+  }
 
   return (
     <aside className="w-64 border-r border-border bg-secondary/30 flex-col hidden md:flex backdrop-blur-xl">

@@ -6,12 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Settings, Building, Key, Bell, Shield, Cloud, CreditCard, Plug, Database, Smartphone } from "lucide-react";
+import { Settings, Building, Key, Bell, Shield, Cloud, CreditCard, Plug, Database, Smartphone, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("company");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const { user } = useAuth();
+  const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
 
   // State for Settings
   const [companyData, setCompanyData] = useState({
@@ -33,6 +37,13 @@ export default function SettingsPage() {
     twilioAuthToken: "",
     twilioPhoneNumber: "",
     resendApiKey: "",
+  });
+
+  const [awsConfig, setAwsConfig] = useState({
+    awsCognitoDomain: "",
+    awsCognitoClientId: "",
+    awsCognitoClientSecret: "",
+    awsCognitoRedirectUri: "",
   });
 
   useEffect(() => {
@@ -59,6 +70,12 @@ export default function SettingsPage() {
             twilioAuthToken: data.twilioAuthToken || "",
             twilioPhoneNumber: data.twilioPhoneNumber || "",
             resendApiKey: data.resendApiKey || "",
+          });
+          setAwsConfig({
+            awsCognitoDomain: data.awsCognitoDomain || "",
+            awsCognitoClientId: data.awsCognitoClientId || "",
+            awsCognitoClientSecret: data.awsCognitoClientSecret || "",
+            awsCognitoRedirectUri: data.awsCognitoRedirectUri || `http://${window.location.hostname}:3000/auth/aws/callback`,
           });
         }
       } catch (e) {
@@ -92,6 +109,10 @@ export default function SettingsPage() {
           twilioAuthToken: apiKeys.twilioAuthToken,
           twilioPhoneNumber: apiKeys.twilioPhoneNumber,
           resendApiKey: apiKeys.resendApiKey,
+          awsCognitoDomain: awsConfig.awsCognitoDomain,
+          awsCognitoClientId: awsConfig.awsCognitoClientId,
+          awsCognitoClientSecret: awsConfig.awsCognitoClientSecret,
+          awsCognitoRedirectUri: awsConfig.awsCognitoRedirectUri,
         })
       });
 
@@ -106,6 +127,18 @@ export default function SettingsPage() {
       setIsSaving(false);
     }
   };
+
+  if (!isAdminOrOwner) {
+    return (
+      <div className="flex-1 overflow-auto p-8 relative z-10 flex items-center justify-center">
+        <GlassCard className="flex flex-col items-center justify-center p-12 text-center max-w-md border-red-500/20">
+          <AlertTriangle className="w-16 h-16 text-red-400 mb-4" />
+          <h3 className="text-xl font-bold text-zinc-100">Brak Uprawnień</h3>
+          <p className="text-zinc-400 mt-2">Dostęp do ustawień systemu posiada wyłącznie Właściciel oraz Administrator.</p>
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-6xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -412,6 +445,58 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* AWS Cognito */}
+                <div className="p-5 rounded-xl bg-zinc-900/50 border border-zinc-800 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-orange-500/20 p-2 rounded-lg text-orange-400"><Cloud className="w-5 h-5" /></div>
+                      <div>
+                        <h3 className="font-bold text-zinc-200">Logowanie AWS (IAM / Cognito SSO)</h3>
+                        <p className="text-xs text-zinc-500">Pozwala pracownikom logować się kontem AWS.</p>
+                      </div>
+                    </div>
+                    <div className="px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full text-xs font-medium">Połączono</div>
+                  </div>
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label className="text-zinc-400 text-xs uppercase tracking-wider">AWS Cognito Domain</Label>
+                      <Input 
+                        value={awsConfig.awsCognitoDomain} 
+                        onChange={e => setAwsConfig({...awsConfig, awsCognitoDomain: e.target.value})} 
+                        className="bg-zinc-950 border-zinc-800 text-zinc-400 focus-visible:ring-orange-500 font-mono" 
+                        placeholder="https://twoja-domena.auth.eu-central-1.amazoncognito.com"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-zinc-400 text-xs uppercase tracking-wider">Client ID</Label>
+                      <Input 
+                        type="password"
+                        value={awsConfig.awsCognitoClientId} 
+                        onChange={e => setAwsConfig({...awsConfig, awsCognitoClientId: e.target.value})} 
+                        className="bg-zinc-950 border-zinc-800 text-zinc-400 focus-visible:ring-orange-500 font-mono" 
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-zinc-400 text-xs uppercase tracking-wider">Client Secret</Label>
+                      <Input 
+                        type="password" 
+                        value={awsConfig.awsCognitoClientSecret} 
+                        onChange={e => setAwsConfig({...awsConfig, awsCognitoClientSecret: e.target.value})} 
+                        className="bg-zinc-950 border-zinc-800 text-zinc-400 focus-visible:ring-orange-500 font-mono" 
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-zinc-400 text-xs uppercase tracking-wider">Redirect URI</Label>
+                      <Input 
+                        value={awsConfig.awsCognitoRedirectUri} 
+                        onChange={e => setAwsConfig({...awsConfig, awsCognitoRedirectUri: e.target.value})} 
+                        className="bg-zinc-950 border-zinc-800 text-zinc-400 focus-visible:ring-orange-500 font-mono" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </GlassCard>
           )}

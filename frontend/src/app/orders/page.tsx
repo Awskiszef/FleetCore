@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 
 interface RepairOrder {
@@ -35,6 +36,9 @@ interface VehicleOption {
 }
 
 export default function RepairOrdersPage() {
+  const { user } = useAuth();
+  const canCreateOrder = user?.role === 'ADMIN' || user?.role === 'OWNER' || user?.role === 'RECEPTIONIST';
+
   const [orders, setOrders] = useState<RepairOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -162,9 +166,11 @@ export default function RepairOrdersPage() {
           <p className="text-zinc-400 mt-2 text-lg">Zarządzaj przepływem pracy w warsztacie.</p>
         </div>
         
-        <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
-          <Plus className="mr-2 h-4 w-4" /> Nowe Zlecenie
-        </Button>
+        {canCreateOrder && (
+          <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
+            <Plus className="mr-2 h-4 w-4" /> Nowe Zlecenie
+          </Button>
+        )}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-[500px]">
             <DialogHeader>

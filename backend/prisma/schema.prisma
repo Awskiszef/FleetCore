@@ -26,13 +26,15 @@ enum RepairOrderStatus {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String?
   fullName     String
-  role         Role     @default(MECHANIC)
+  role         Role      @default(MECHANIC)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  repairOrders RepairOrder[] @relation("MechanicOrders")
 }
 
 model Customer {
@@ -89,6 +91,7 @@ model RepairOrder {
   vehicleId          String
   vehicle            Vehicle           @relation(fields: [vehicleId], references: [id])
   assignedMechanicId String?
+  assignedMechanic   User?             @relation("MechanicOrders", fields: [assignedMechanicId], references: [id])
   status             RepairOrderStatus @default(NEW)
   reportedIssue      String
   diagnosis          String?
@@ -182,7 +185,11 @@ model FleetVehicleLog {
   type           FleetLogType
   mileage        Int?
   cost           Float?
+  liters         Float?
   title          String
+  location       String?
+  policyNumber   String?
+  provider       String?
   notes          String?
   createdAt      DateTime     @default(now())
 }

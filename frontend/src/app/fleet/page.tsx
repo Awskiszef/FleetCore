@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, CarFront, AlertCircle, ChevronRight, Fuel, Wrench, Settings, Package, Calendar } from "lucide-react";
+import { Plus, CarFront, AlertCircle, ChevronRight, Fuel, Wrench, Settings, Package, Calendar, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,8 @@ interface FleetLog {
 }
 
 export default function FleetPage() {
+  const { user } = useAuth();
+  const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -94,6 +97,27 @@ export default function FleetPage() {
     }
   };
 
+  const handleDeleteVehicle = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!window.confirm("Czy na pewno chcesz usunąć ten pojazd ze swojej floty? Operacja jest nieodwracalna.")) return;
+    
+    try {
+      const response = await fetch(`http://${window.location.hostname}:3001/fleet/${id}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        toast.success("Pojazd został usunięty.");
+        await fetchVehicles();
+      } else {
+        toast.error("Błąd podczas usuwania.");
+      }
+    } catch (error) {
+      toast.error("Błąd połączenia.");
+    }
+  };
+
   const calculateTotalCost = (logs: FleetLog[]) => {
     return logs.reduce((acc, log) => acc + (log.cost || 0), 0);
   };
@@ -111,13 +135,15 @@ export default function FleetPage() {
             </h1>
             <p className="text-zinc-400 mt-1">Dziennik pojazdów i historii wydatków na własne auta.</p>
           </div>
-          <Button 
-            className="bg-cyan-500 hover:bg-cyan-600 text-black font-semibold"
-            onClick={() => setIsDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Dodaj pojazd
-          </Button>
+          {isAdminOrOwner && (
+            <Button 
+              className="bg-cyan-500 hover:bg-cyan-600 text-black font-semibold"
+              onClick={() => setIsDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Dodaj pojazd
+            </Button>
+          )}
         </div>
 
         {/* List */}
@@ -137,8 +163,18 @@ export default function FleetPage() {
               const totalCost = calculateTotalCost(v.logs);
               return (
                 <Link href={`/fleet/${v.id}`} key={v.id}>
-                  <GlassCard className="p-6 flex flex-col h-full hover:border-cyan-500/50 transition-all cursor-pointer group hover:bg-zinc-900/60">
-                    <div className="flex justify-between items-start mb-4">
+                  <GlassCard className="p-6 flex flex-col h-full hover:border-cyan-500/50 transition-all cursor-pointer group hover:bg-zinc-900/60 relative">
+                    {isAdminOrOwner && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => handleDeleteVehicle(e, v.id)}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:bg-red-500/10 hover:text-red-300 z-10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <div className="flex justify-between items-start mb-4 pr-8">
                       <div>
                         <h3 className="text-xl font-bold text-zinc-100 group-hover:text-cyan-400 transition-colors">
                           {v.name}

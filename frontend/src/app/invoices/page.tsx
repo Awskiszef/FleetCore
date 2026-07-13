@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Receipt, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react";
+import { Receipt, ChevronLeft, ChevronRight, Download, FileText, Loader2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
@@ -28,6 +30,34 @@ export default function InvoicesPage() {
       console.error("Failed to fetch invoices", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    setDownloadingId(orderId);
+    toast.info("Pobieranie faktury...", { id: "download-invoice" });
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/repair-orders/${orderId}/invoice-pdf`);
+      
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Faktura_${orderId.substring(0,8)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success("Faktura pobrana.", { id: "download-invoice" });
+      } else {
+        toast.error("Nie udało się pobrać faktury.", { id: "download-invoice" });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Błąd połączenia.", { id: "download-invoice" });
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -138,14 +168,13 @@ export default function InvoicesPage() {
                         {getStatusBadge(inv.status)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <a 
-                          href={`http://${window.location.hostname}:3001/repair-orders/${order.id}/invoice-pdf`} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full px-3 py-1.5 inline-flex items-center justify-center text-xs font-medium transition-colors border border-zinc-700"
+                        <Button 
+                          onClick={() => handleDownloadInvoice(order.id)}
+                          disabled={downloadingId === order.id}
+                          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full px-3 py-1.5 h-8 inline-flex items-center justify-center text-xs font-medium transition-colors border border-zinc-700"
                         >
-                          <Download className="mr-1.5 h-3 w-3" /> PDF
-                        </a>
+                          {downloadingId === order.id ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Download className="mr-1.5 h-3 w-3" />} PDF
+                        </Button>
                       </td>
                     </tr>
                   );

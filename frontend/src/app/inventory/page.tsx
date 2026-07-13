@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Plus, Trash2, Edit, PackagePlus, PackageMinus } from "lucide-react";
+import { Search, Plus, Trash2, Edit, PackagePlus, PackageMinus, AlertCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Part {
   id: string;
@@ -21,6 +22,7 @@ interface Part {
 }
 
 export default function InventoryPage() {
+  const { user } = useAuth();
   const [parts, setParts] = useState<Part[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");

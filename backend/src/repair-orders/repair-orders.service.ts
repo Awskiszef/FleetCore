@@ -49,6 +49,7 @@ export class RepairOrdersService {
       include: {
         customer: true,
         vehicle: true,
+        assignedMechanic: true,
         parts: { include: { part: true } }
       }
     });

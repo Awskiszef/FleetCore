@@ -107,7 +107,7 @@ export default function VehicleProfilePage() {
 
     setIsUploading(true);
     try {
-      const res = await fetch('http://localhost:3001/attachments', {
+      const res = await fetch(`http://${window.location.hostname}:3001/attachments`, {
         method: 'POST',
         body: formData,
       });

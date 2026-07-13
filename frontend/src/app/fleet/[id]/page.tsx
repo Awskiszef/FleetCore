@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Plus, CarFront, Fuel, Wrench, Package, ShieldCheck, MoreHorizontal, Calendar, DollarSign, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, CarFront, Fuel, Wrench, Package, ShieldCheck, MoreHorizontal, Calendar, DollarSign, Trash2, MapPin, FileText, Hash } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FleetVehicle {
   id: string;
@@ -28,6 +29,10 @@ interface FleetLog {
   type: "REFUEL" | "SERVICE" | "PARTS" | "INSURANCE" | "OTHER";
   mileage: number | null;
   cost: number | null;
+  liters: number | null;
+  location: string | null;
+  policyNumber: string | null;
+  provider: string | null;
   title: string;
   notes: string | null;
 }
@@ -52,7 +57,9 @@ const LogTypeLabel = ({ type }: { type: string }) => {
   }
 };
 
-export default function FleetVehicleDetailsPage() {
+export default function FleetVehicleProfilePage() {
+  const { user } = useAuth();
+  const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
   const params = useParams();
   const router = useRouter();
   const vehicleId = params.id as string;
@@ -60,6 +67,8 @@ export default function FleetVehicleDetailsPage() {
   const [vehicle, setVehicle] = useState<FleetVehicle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
+  const [selectedLog, setSelectedLog] = useState<FleetLog | null>(null);
+
   // Log Dialog
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +78,10 @@ export default function FleetVehicleDetailsPage() {
     date: new Date().toISOString().split('T')[0],
     mileage: "",
     cost: "",
+    liters: "",
+    location: "",
+    policyNumber: "",
+    provider: "",
     notes: ""
   });
 
@@ -106,13 +119,17 @@ export default function FleetVehicleDetailsPage() {
           date: new Date(logForm.date).toISOString(),
           mileage: logForm.mileage ? parseInt(logForm.mileage) : undefined,
           cost: logForm.cost ? parseFloat(logForm.cost) : undefined,
+          liters: logForm.type === 'REFUEL' && logForm.liters ? parseFloat(logForm.liters) : undefined,
+          location: logForm.location || undefined,
+          policyNumber: logForm.type === 'INSURANCE' && logForm.policyNumber ? logForm.policyNumber : undefined,
+          provider: logForm.type === 'INSURANCE' && logForm.provider ? logForm.provider : undefined,
           notes: logForm.notes || undefined,
         }),
       });
       
       if (response.ok) {
         setIsLogDialogOpen(false);
-        setLogForm({ ...logForm, title: "", cost: "", notes: "" });
+        setLogForm({ ...logForm, title: "", cost: "", liters: "", location: "", policyNumber: "", provider: "", notes: "" });
         await fetchVehicle();
         toast.success("Wpis został dodany.");
       } else {
@@ -133,10 +150,28 @@ export default function FleetVehicleDetailsPage() {
       });
       if (response.ok) {
         toast.success("Wpis usunięty.");
+        setSelectedLog(null);
         await fetchVehicle();
       }
     } catch (e) {
-      toast.error("Błąd podczas usuwania.");
+      toast.error("Błąd usuwania wpisu.");
+    }
+  };
+
+  const handleDeleteVehicle = async () => {
+    if (!window.confirm("Czy na pewno chcesz usunąć ten pojazd ze swojej floty? Operacja jest nieodwracalna.")) return;
+    try {
+      const response = await fetch(`http://${window.location.hostname}:3001/fleet/${vehicleId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        toast.success("Pojazd usunięty.");
+        router.push("/fleet");
+      } else {
+        toast.error("Wystąpił błąd podczas usuwania pojazdu.");
+      }
+    } catch (e) {
+      toast.error("Błąd połączenia z serwerem.");
     }
   };
 
@@ -152,6 +187,22 @@ export default function FleetVehicleDetailsPage() {
 
   const totalCost = vehicle.logs.reduce((sum, log) => sum + (log.cost || 0), 0);
   const maxMileage = Math.max(...vehicle.logs.map(l => l.mileage || 0), 0);
+
+  let averageFuelConsumption: number | null = null;
+  const refuels = vehicle.logs
+    .filter(l => l.type === "REFUEL" && l.mileage && l.liters)
+    .sort((a, b) => (a.mileage || 0) - (b.mileage || 0));
+
+  if (refuels.length >= 2) {
+    const firstMileage = refuels[0].mileage!;
+    const lastMileage = refuels[refuels.length - 1].mileage!;
+    const distance = lastMileage - firstMileage;
+    
+    if (distance > 0) {
+      const usedLiters = refuels.slice(1).reduce((sum, l) => sum + (l.liters || 0), 0);
+      averageFuelConsumption = (usedLiters / distance) * 100;
+    }
+  }
 
   return (
     <div className="flex-1 overflow-auto p-8 relative z-10">
@@ -170,17 +221,29 @@ export default function FleetVehicleDetailsPage() {
             </h1>
             <p className="text-zinc-400 mt-1">{vehicle.make} {vehicle.model} • {vehicle.licensePlate || "Brak Rej"}</p>
           </div>
-          <Button 
-            className="bg-cyan-500 hover:bg-cyan-600 text-black font-semibold"
-            onClick={() => setIsLogDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Dodaj wpis
-          </Button>
+          <div className="flex gap-2">
+            {isAdminOrOwner && (
+              <Button 
+                variant="outline"
+                className="border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                onClick={handleDeleteVehicle}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Usuń pojazd
+              </Button>
+            )}
+            <Button 
+              className="bg-cyan-500 hover:bg-cyan-600 text-black font-semibold"
+              onClick={() => setIsLogDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Dodaj wpis
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <GlassCard className="p-6 flex items-center gap-4 border-l-4 border-l-cyan-500">
             <div className="p-3 rounded-full bg-cyan-500/10 text-cyan-400">
               <CarFront className="w-6 h-6" />
@@ -210,6 +273,16 @@ export default function FleetVehicleDetailsPage() {
               <p className="text-2xl font-bold text-zinc-100">{maxMileage > 0 ? `${maxMileage.toLocaleString()} km` : "Brak"}</p>
             </div>
           </GlassCard>
+
+          <GlassCard className="p-6 flex items-center gap-4 border-l-4 border-l-amber-500">
+            <div className="p-3 rounded-full bg-amber-500/10 text-amber-400">
+              <Fuel className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-zinc-500">Średnie Spalanie</p>
+              <p className="text-2xl font-bold text-zinc-100">{averageFuelConsumption !== null ? `${averageFuelConsumption.toFixed(2)} l/100` : "Brak danych"}</p>
+            </div>
+          </GlassCard>
         </div>
 
         {/* Timeline */}
@@ -227,12 +300,18 @@ export default function FleetVehicleDetailsPage() {
                   <LogIcon type={log.type} />
                 </div>
                 
-                <GlassCard className="p-5 border-zinc-800/50 group-hover:border-zinc-700 transition-colors relative">
+                <GlassCard 
+                  className="p-5 border-zinc-800/50 hover:border-cyan-500/50 transition-colors relative cursor-pointer"
+                  onClick={() => setSelectedLog(log)}
+                >
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    onClick={() => handleDeleteLog(log.id)}
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300 hover:bg-red-500/10 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteLog(log.id);
+                    }}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -250,6 +329,13 @@ export default function FleetVehicleDetailsPage() {
                     </div>
                   </div>
                   
+                  {log.location && (
+                    <div className="flex items-center gap-1.5 text-zinc-400 text-sm mb-3">
+                      <MapPin className="w-4 h-4 text-cyan-500/70" />
+                      {log.location}
+                    </div>
+                  )}
+                  
                   {log.notes && (
                     <p className="text-zinc-300 text-sm whitespace-pre-wrap mb-3">{log.notes}</p>
                   )}
@@ -257,6 +343,11 @@ export default function FleetVehicleDetailsPage() {
                   {log.cost !== null && log.cost > 0 && (
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-red-500/10 text-red-400 font-semibold text-sm border border-red-500/20">
                       -{log.cost.toFixed(2)} PLN
+                    </div>
+                  )}
+                  {log.liters !== null && log.liters > 0 && (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-amber-500/10 text-amber-400 font-semibold text-sm border border-amber-500/20 ml-2">
+                      {log.liters.toFixed(2)} L
                     </div>
                   )}
                 </GlassCard>
@@ -334,6 +425,51 @@ export default function FleetVehicleDetailsPage() {
               />
             </div>
             
+            {logForm.type === 'REFUEL' && (
+              <div className="grid gap-2">
+                <Label className="text-zinc-400">Zatankowane paliwo (Litry)</Label>
+                <Input 
+                  type="number"
+                  step="0.01"
+                  value={logForm.liters} 
+                  onChange={e => setLogForm({...logForm, liters: e.target.value})}
+                  className="bg-zinc-900 border-zinc-800 text-zinc-100 focus-visible:ring-cyan-500"
+                  placeholder="np. 45.5"
+                />
+              </div>
+            )}
+            
+            <div className="grid gap-2">
+              <Label className="text-zinc-400">Miejsce / Stacja (opcjonalnie)</Label>
+              <Input 
+                value={logForm.location} 
+                onChange={e => setLogForm({...logForm, location: e.target.value})}
+                className="bg-zinc-900 border-zinc-800 text-zinc-100 focus-visible:ring-cyan-500"
+                placeholder="np. Orlen, Warsztat Auto-Kowalski"
+              />
+            </div>
+            
+            {logForm.type === 'INSURANCE' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label className="text-zinc-400">Ubezpieczyciel (np. PZU)</Label>
+                  <Input 
+                    value={logForm.provider} 
+                    onChange={e => setLogForm({...logForm, provider: e.target.value})}
+                    className="bg-zinc-900 border-zinc-800 text-zinc-100 focus-visible:ring-cyan-500"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-zinc-400">Numer Polisy</Label>
+                  <Input 
+                    value={logForm.policyNumber} 
+                    onChange={e => setLogForm({...logForm, policyNumber: e.target.value})}
+                    className="bg-zinc-900 border-zinc-800 text-zinc-100 focus-visible:ring-cyan-500"
+                  />
+                </div>
+              </div>
+            )}
+            
             <div className="grid gap-2">
               <Label className="text-zinc-400">Notatki / Szczegóły</Label>
               <textarea 
@@ -353,6 +489,103 @@ export default function FleetVehicleDetailsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Details Dialog */}
+      <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <DialogContent className="bg-zinc-950 border border-zinc-800 text-zinc-100 max-w-lg">
+          {selectedLog && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <LogIcon type={selectedLog.type} />
+                  {selectedLog.title}
+                </DialogTitle>
+                <div className="text-cyan-400 text-sm font-medium mt-1">
+                  <LogTypeLabel type={selectedLog.type} />
+                </div>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> Data
+                    </span>
+                    <span className="text-zinc-100 font-medium">{new Date(selectedLog.date).toLocaleDateString("pl-PL")}</span>
+                  </div>
+                  {selectedLog.mileage && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                        <CarFront className="w-3 h-3" /> Przebieg
+                      </span>
+                      <span className="text-zinc-100 font-medium">{selectedLog.mileage.toLocaleString()} km</span>
+                    </div>
+                  )}
+                  {selectedLog.cost !== null && selectedLog.cost > 0 && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                        <DollarSign className="w-3 h-3" /> Koszt
+                      </span>
+                      <span className="text-red-400 font-medium">{selectedLog.cost.toFixed(2)} PLN</span>
+                    </div>
+                  )}
+                  {selectedLog.liters !== null && selectedLog.liters > 0 && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                        <Fuel className="w-3 h-3" /> Paliwo
+                      </span>
+                      <span className="text-amber-400 font-medium">{selectedLog.liters.toFixed(2)} L</span>
+                    </div>
+                  )}
+                  {selectedLog.location && (
+                    <div className="col-span-2 flex flex-col gap-1">
+                      <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> Miejsce / Stacja
+                      </span>
+                      <span className="text-zinc-100 font-medium">{selectedLog.location}</span>
+                    </div>
+                  )}
+                  {selectedLog.provider && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3" /> Ubezpieczyciel
+                      </span>
+                      <span className="text-zinc-100 font-medium">{selectedLog.provider}</span>
+                    </div>
+                  )}
+                  {selectedLog.policyNumber && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                        <Hash className="w-3 h-3" /> Numer Polisy
+                      </span>
+                      <span className="text-zinc-100 font-medium">{selectedLog.policyNumber}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {selectedLog.notes && (
+                  <div className="flex flex-col gap-2 pt-4 border-t border-zinc-800">
+                    <span className="text-zinc-500 text-xs uppercase font-semibold flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> Notatki i szczegóły
+                    </span>
+                    <p className="text-zinc-300 text-sm whitespace-pre-wrap bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">
+                      {selectedLog.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="flex justify-between items-center w-full">
+                <Button variant="ghost" onClick={() => handleDeleteLog(selectedLog.id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Usuń wpis
+                </Button>
+                <Button onClick={() => setSelectedLog(null)} className="bg-zinc-800 hover:bg-zinc-700 text-white">
+                  Zamknij
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
