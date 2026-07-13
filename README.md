@@ -59,6 +59,12 @@ Dzięki modułowi `NotificationsService`, każda zmiana statusu w Zleceniu Napra
 - Jeśli auto wchodzi na warsztat, system wysyła np. "Witaj Jan! Twoje zlecenie zmieniło status na: DIAGNOZA".
 - Integracje: **Twilio** (dla SMS) oraz **Resend** (dla E-maili).
 
+### Logowanie przez AWS Cognito (IAM SSO)
+System wykorzystuje bezpieczne środowisko chmurowe **AWS IAM Identity Center** z protokołem OAuth2 (Authorization Code Grant).
+- Zarządzanie uwierzytelnianiem i poświadczeniami jest oddelegowane do globalnego profilu pracownika w AWS.
+- System dynamicznie ładuje konfigurację i klucze logowania z bazy danych (do edycji w panelu *Ustawienia*).
+- Zastosowano agresywny firewall na froncie: logowanie użytkowników, których e-mail nie istnieje w wewnętrznej bazie kadr FleetCore skutkuje rzuceniem natychmiastowego pełnoekranowego wyjątku w postaci zaporowego czerwonego ekranu z brakiem możliwości ominięcia.
+
 ### Fakturowanie (inFakt)
 Rozliczenia finansowe są w pełni powiązane z popularnym w Polsce systemem księgowym **inFakt**. 
 Z poziomu podglądu zakończonego zlecenia wystarczy kliknąć "Wystaw Fakturę". 
@@ -73,13 +79,15 @@ Z poziomu podglądu zakończonego zlecenia wystarczy kliknąć "Wystaw Fakturę"
 Aplikacja jest pełnoprawnym projektem typu Full-Stack. Wykorzystano tu topowe narzędzia Enterprise:
 
 * **Frontend:** 
-  - Zbudowany na platformie `Next.js 16` (TypeScript / React).
+  - Zbudowany na platformie `Next.js 15` (TypeScript / React).
   - Wykorzystano `TailwindCSS` oraz `Lucide-React` (ikony) wraz z komponentami "shadcn/ui" do wykreowania profesjonalnego stylu (glassmorphism).
 * **Backend:** 
   - Restowe API oparte na mocarnym frameworku `NestJS`, pracujące pod kontrolą serwera NodeJS. 
-  - Silnie zmodularyzowana struktura oparta o Controller/Service.
-* **Baza Danych:** 
+  - Silnie zmodularyzowana struktura oparta o Controller/Service, walidacja JWT, bcrypt.
+* **Baza Danych i Autoryzacja:** 
   - Relacyjna baza `PostgreSQL`, zintegrowana przez ORM `Prisma`.
+  - Architektura oparta na Role-Based Access Control (RBAC): `ADMIN`, `OWNER`, `RECEPTIONIST`, `MECHANIC`.
+  - Zintegrowane przepływy uwierzytelniania przez **AWS Cognito / IAM**.
 
 ---
 
@@ -95,7 +103,7 @@ Klucze do API docelowo uzupełnia się w graficznym panelu **Ustawienia**, jedna
 DATABASE_URL="postgresql://uzytkownik:haslo@localhost:5432/atlashc_garage?schema=public"
 JWT_SECRET="super-secret-jwt-key"
 
-# Wskazówka: Cała reszta kluczy (inFakt, Twilio, Vincario, Resend) zapisywana 
+# Wskazówka: Cała reszta kluczy (inFakt, Twilio, Vincario, Resend, AWS Cognito SSO) zapisywana 
 # jest w nowym elastycznym module ustawień bezpośrednio z interfejsu (zakładka Ustawienia). 
 # Możesz wpisać je także tutaj jako fallback, zgodnie z nazwami używanymi w serwisach.
 ```
