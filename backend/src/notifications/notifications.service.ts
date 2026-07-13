@@ -1,19 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import { Twilio } from 'twilio';
-import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private settingsService: SettingsService) {}
 
   async sendEmail(to: string, subject: string, htmlContent: string) {
-    const apiKeySetting = await this.prisma.setting.findUnique({
-      where: { key: 'resendApiKey' },
-    });
-    const apiKey = apiKeySetting?.value || process.env.RESEND_API_KEY;
+    const apiKey = await this.settingsService.getSecret('resendApiKey');
 
     if (!apiKey) {
       this.logger.warn(
@@ -47,21 +44,11 @@ export class NotificationsService {
   }
 
   async sendSms(to: string, message: string) {
-    const sidSetting = await this.prisma.setting.findUnique({
-      where: { key: 'twilioAccountSid' },
-    });
-    const tokenSetting = await this.prisma.setting.findUnique({
-      where: { key: 'twilioAuthToken' },
-    });
-    const phoneSetting = await this.prisma.setting.findUnique({
-      where: { key: 'twilioPhoneNumber' },
-    });
-
-    const twilioSid = sidSetting?.value || process.env.TWILIO_ACCOUNT_SID;
+    const twilioSid = await this.settingsService.getSecret('twilioAccountSid');
     const twilioAuthToken =
-      tokenSetting?.value || process.env.TWILIO_AUTH_TOKEN;
+      await this.settingsService.getSecret('twilioAuthToken');
     const twilioPhone =
-      phoneSetting?.value || process.env.TWILIO_PHONE_NUMBER || '+1234567890';
+      await this.settingsService.getValue('twilioPhoneNumber');
 
     if (!twilioSid || !twilioAuthToken) {
       this.logger.warn(
@@ -74,7 +61,7 @@ export class NotificationsService {
       const twilioClient = new Twilio(twilioSid, twilioAuthToken);
       const response = await twilioClient.messages.create({
         body: message,
-        from: twilioPhone,
+        from: twilioPhone || undefined,
         to: to,
       });
       this.logger.log(`SMS sent successfully to ${to}: ${response.sid}`);

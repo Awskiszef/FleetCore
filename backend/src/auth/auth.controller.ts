@@ -101,16 +101,16 @@ export class AuthController {
   @Public()
   @Get('aws/config')
   async getAwsConfig() {
-    const map = await this.settingsService.getAll(false);
+    const domain = await this.settingsService.getValue('awsCognitoDomain');
+    const clientId = await this.settingsService.getValue('awsCognitoClientId');
+    const redirectUri = await this.settingsService.getValue(
+      'awsCognitoRedirectUri',
+    );
 
     return {
-      domain: map['awsCognitoDomain'] || process.env.AWS_COGNITO_DOMAIN || '',
-      clientId:
-        map['awsCognitoClientId'] || process.env.AWS_COGNITO_CLIENT_ID || '',
-      redirectUri:
-        map['awsCognitoRedirectUri'] ||
-        process.env.AWS_COGNITO_REDIRECT_URI ||
-        '',
+      domain: domain || '',
+      clientId: clientId || '',
+      redirectUri: redirectUri || '',
     };
   }
 
@@ -122,15 +122,14 @@ export class AuthController {
       throw new UnauthorizedException('Błędne dane logowania');
     }
 
-    const map = await this.settingsService.getAll(false);
-
-    const domain = map['awsCognitoDomain'] || process.env.AWS_COGNITO_DOMAIN;
-    const clientId =
-      map['awsCognitoClientId'] || process.env.AWS_COGNITO_CLIENT_ID;
-    const clientSecret =
-      map['awsCognitoClientSecret'] || process.env.AWS_COGNITO_CLIENT_SECRET;
-    const redirectUri =
-      map['awsCognitoRedirectUri'] || process.env.AWS_COGNITO_REDIRECT_URI;
+    const domain = await this.settingsService.getValue('awsCognitoDomain');
+    const clientId = await this.settingsService.getValue('awsCognitoClientId');
+    const redirectUri = await this.settingsService.getValue(
+      'awsCognitoRedirectUri',
+    );
+    const clientSecret = await this.settingsService.getSecret(
+      'awsCognitoClientSecret',
+    );
 
     if (!domain || !clientId || !clientSecret || !redirectUri) {
       if (

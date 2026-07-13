@@ -1,17 +1,14 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class InfaktService {
   private readonly apiUrl = 'https://api.infakt.pl/api/v3';
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private settingsService: SettingsService) {}
 
   private async getHeaders() {
-    const setting = await this.prisma.setting.findUnique({
-      where: { key: 'infaktApiKey' },
-    });
-    const apiKey = setting?.value || process.env.INFAKT_API_KEY;
+    const apiKey = await this.settingsService.getSecret('infaktApiKey');
 
     if (!apiKey || apiKey === 'wprowadz_tutaj_swoj_klucz_api_infakt') {
       throw new HttpException(

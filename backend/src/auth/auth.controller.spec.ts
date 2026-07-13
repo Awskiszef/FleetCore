@@ -35,6 +35,12 @@ describe('AuthController', () => {
     };
     settingsService = {
       getAll: jest.fn().mockResolvedValue({}),
+      getValue: jest.fn().mockImplementation(async (key) => {
+        return undefined; // Or simulated values if needed
+      }),
+      getSecret: jest.fn().mockImplementation(async (key) => {
+        return undefined;
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -74,7 +80,8 @@ describe('AuthController', () => {
   });
 
   it('1. Brak konfiguracji AWS zwraca 503, nie token', async () => {
-    settingsService.getAll.mockResolvedValue({}); // no aws config
+    settingsService.getValue.mockResolvedValue(undefined);
+    settingsService.getSecret.mockResolvedValue(undefined);
 
     await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
       ServiceUnavailableException,
@@ -84,7 +91,8 @@ describe('AuthController', () => {
   it('2. AWS_SSO_MOCK_ENABLED=true w produkcji blokuje callback', async () => {
     process.env.NODE_ENV = 'production';
     process.env.AWS_SSO_MOCK_ENABLED = 'true';
-    settingsService.getAll.mockResolvedValue({});
+    settingsService.getValue.mockResolvedValue(undefined);
+    settingsService.getSecret.mockResolvedValue(undefined);
 
     await expect(controller.awsCallback({ code: 'code123' })).rejects.toThrow(
       ServiceUnavailableException,
@@ -95,11 +103,15 @@ describe('AuthController', () => {
   });
 
   it('4. Token z błędnym issuer jest odrzucany', async () => {
-    settingsService.getAll.mockResolvedValue({
-      awsCognitoDomain: 'https://domain.com',
-      awsCognitoClientId: 'client-id',
-      awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback',
+    settingsService.getValue.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoDomain') return 'https://domain.com';
+      if (k === 'awsCognitoClientId') return 'client-id';
+      if (k === 'awsCognitoRedirectUri') return 'http://localhost/callback';
+      return undefined;
+    });
+    settingsService.getSecret.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoClientSecret') return 'secret';
+      return undefined;
     });
 
     // Mock jwt.verify to throw error like it would for wrong issuer
@@ -113,11 +125,15 @@ describe('AuthController', () => {
   });
 
   it('5. Token z błędnym audience jest odrzucany', async () => {
-    settingsService.getAll.mockResolvedValue({
-      awsCognitoDomain: 'https://domain.com',
-      awsCognitoClientId: 'client-id',
-      awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback',
+    settingsService.getValue.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoDomain') return 'https://domain.com';
+      if (k === 'awsCognitoClientId') return 'client-id';
+      if (k === 'awsCognitoRedirectUri') return 'http://localhost/callback';
+      return undefined;
+    });
+    settingsService.getSecret.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoClientSecret') return 'secret';
+      return undefined;
     });
 
     (jwt.verify as jest.Mock).mockImplementation((token, key, options, cb) => {
@@ -130,11 +146,15 @@ describe('AuthController', () => {
   });
 
   it('6. Token z algorytmem innym niż RS256 jest odrzucany', async () => {
-    settingsService.getAll.mockResolvedValue({
-      awsCognitoDomain: 'https://domain.com',
-      awsCognitoClientId: 'client-id',
-      awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback',
+    settingsService.getValue.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoDomain') return 'https://domain.com';
+      if (k === 'awsCognitoClientId') return 'client-id';
+      if (k === 'awsCognitoRedirectUri') return 'http://localhost/callback';
+      return undefined;
+    });
+    settingsService.getSecret.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoClientSecret') return 'secret';
+      return undefined;
     });
 
     (jwt.verify as jest.Mock).mockImplementation((token, key, options, cb) => {
@@ -147,11 +167,15 @@ describe('AuthController', () => {
   });
 
   it('7. Użytkownik nieobecny w lokalnej bazie nie otrzymuje tokenu FleetCore', async () => {
-    settingsService.getAll.mockResolvedValue({
-      awsCognitoDomain: 'https://domain.com',
-      awsCognitoClientId: 'client-id',
-      awsCognitoClientSecret: 'secret',
-      awsCognitoRedirectUri: 'http://localhost/callback',
+    settingsService.getValue.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoDomain') return 'https://domain.com';
+      if (k === 'awsCognitoClientId') return 'client-id';
+      if (k === 'awsCognitoRedirectUri') return 'http://localhost/callback';
+      return undefined;
+    });
+    settingsService.getSecret.mockImplementation(async (k: string) => {
+      if (k === 'awsCognitoClientSecret') return 'secret';
+      return undefined;
     });
 
     (jwt.verify as jest.Mock).mockImplementation((token, key, options, cb) => {

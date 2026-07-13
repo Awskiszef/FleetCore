@@ -12,17 +12,17 @@ import {
 } from '@nestjs/common';
 import { Roles } from '../auth/roles.decorator';
 import { VehiclesService } from './vehicles.service';
-import { PrismaService } from '../prisma/prisma.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { SettingsService } from '../settings/settings.service';
 import * as crypto from 'crypto';
 
 @Controller('vehicles')
 export class VehiclesController {
   constructor(
     private readonly vehiclesService: VehiclesService,
-    private readonly prisma: PrismaService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   @Post()
@@ -37,15 +37,8 @@ export class VehiclesController {
 
   @Get('decode-vin/:vin')
   async decodeVin(@Param('vin') vin: string) {
-    const settingKey = await this.prisma.setting.findUnique({
-      where: { key: 'vincarioApiKey' },
-    });
-    const settingSecret = await this.prisma.setting.findUnique({
-      where: { key: 'vincarioApiSecret' },
-    });
-
-    const apiKey = settingKey?.value || process.env.VIN_API_KEY;
-    const apiSecret = settingSecret?.value || process.env.VIN_API_SECRET;
+    const apiKey = await this.settingsService.getSecret('vincarioApiKey');
+    const apiSecret = await this.settingsService.getSecret('vincarioApiSecret');
 
     if (!apiKey || apiKey === 'twoj_klucz_api' || !apiSecret) {
       // Zwracamy błąd 400 z instrukcją, że brakuje płatnego klucza
