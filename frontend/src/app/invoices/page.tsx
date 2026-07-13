@@ -5,6 +5,7 @@ import { Receipt, ChevronLeft, ChevronRight, Download, FileText, Loader2 } from 
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { downloadAuthenticatedFile } from "@/lib/download-auth-file";
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -35,27 +36,31 @@ export default function InvoicesPage() {
 
   const handleDownloadInvoice = async (orderId: string) => {
     setDownloadingId(orderId);
-    toast.info("Pobieranie faktury...", { id: "download-invoice" });
+
+    toast.info("Pobieranie faktury...", {
+      id: "download-invoice",
+    });
+
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${orderId}/invoice-pdf`);
-      
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `Faktura_${orderId.substring(0,8)}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        toast.success("Faktura pobrana.", { id: "download-invoice" });
-      } else {
-        toast.error("Nie udało się pobrać faktury.", { id: "download-invoice" });
-      }
+      await downloadAuthenticatedFile(
+        `${process.env.NEXT_PUBLIC_API_URL || ""}/repair-orders/${orderId}/invoice-pdf`,
+        `Faktura_${orderId.substring(0, 8)}.pdf`,
+      );
+
+      toast.success("Faktura została pobrana.", {
+        id: "download-invoice",
+      });
     } catch (error) {
-      console.error(error);
-      toast.error("Błąd połączenia.", { id: "download-invoice" });
+      console.error("Invoice download failed:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Nie udało się pobrać faktury.",
+        {
+          id: "download-invoice",
+        },
+      );
     } finally {
       setDownloadingId(null);
     }
@@ -89,7 +94,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
-      
+
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-5">
@@ -168,7 +173,7 @@ export default function InvoicesPage() {
                         {getStatusBadge(inv.status)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Button 
+                        <Button
                           onClick={() => handleDownloadInvoice(order.id)}
                           disabled={downloadingId === order.id}
                           className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full px-3 py-1.5 h-8 inline-flex items-center justify-center text-xs font-medium transition-colors border border-zinc-700"

@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateEstimateDto } from './dto/create-estimate.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import * as PdfPrinter from 'pdfmake';
+import pdfMake from 'pdfmake';
+import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 import type { Response } from 'express';
 
 @Injectable()
 export class EstimatesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createEstimateDto: CreateEstimateDto, userId: string) {
     const { repairOrderId, validUntil, notes, items } = createEstimateDto;
@@ -72,70 +73,123 @@ export class EstimatesService {
   }
 
   async generatePdf(id: string, res: Response) {
-    const estimate = await this.findOne(id);
+    try {
+      const estimate = await this.findOne(id);
 
-    const fonts = {
-      Roboto: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique',
-      },
-    };
-
-    const printer = new (PdfPrinter as any)(fonts);
-
-    const docDefinition = {
-      content: [
-        { text: `Kosztorys Naprawy`, style: 'header' },
-        { text: `Dla: ${estimate.repairOrder.customer.fullName}` },
-        {
-          text: `Pojazd: ${estimate.repairOrder.vehicle.make} ${estimate.repairOrder.vehicle.model}`,
+      const fonts = {
+        Roboto: {
+          normal: 'Helvetica',
+          bold: 'Helvetica-Bold',
+          italics: 'Helvetica-Oblique',
+          bolditalics: 'Helvetica-BoldOblique',
         },
-        { text: '\n' },
-        {
-          table: {
-            headerRows: 1,
-            widths: ['*', 'auto', 'auto', 'auto', 'auto'],
-            body: [
-              ['Nazwa', 'Ilość', 'Cena Netto', 'VAT', 'Wartość Brutto'],
-              ...estimate.items.map((i) => [
-                i.name,
-                i.quantity.toString(),
-                `${i.unitPrice} PLN`,
-                `${i.taxRate}%`,
-                `${i.totalGross} PLN`,
-              ]),
-              [
-                { text: 'Suma', colSpan: 4, alignment: 'right' },
-                {},
-                {},
-                {},
-                `${estimate.totalGross} PLN`,
+      };
+
+      pdfMake.setFonts(fonts);
+
+      const docDefinition: TDocumentDefinitions = {
+        content: [
+          {
+            text: 'Kosztorys naprawy',
+            style: 'header',
+          },
+          {
+            text: `Numer kosztorysu: ${estimate.id}`,
+            margin: [0, 0, 0, 5],
+          },
+          {
+            text: `Data utworzenia: ${new Date(
+              estimate.createdAt,
+            ).toLocaleDateString('pl-PL')}`,
+            margin: [0, 0, 0, 10],
+          },
+          {
+            text: `Klient: ${estimate.repairOrder.customer?.fullName || 'Brak danych'
+              }`,
+          },
+          {
+            text: `Pojazd: ${estimate.repairOrder.vehicle
+                ? `${estimate.repairOrder.vehicle.make || ''} ${estimate.repairOrder.vehicle.model || ''
+                }`
+                : 'Brak danych'
+              }`,
+            margin: [0, 0, 0, 15],
+          },
+          {
+            table: {
+              headerRows: 1,
+              widths: ['*', 45, 80, 45, 90],
+              body: [
+                [
+                  'Nazwa',
+                  'Ilość',
+                  'Cena netto',
+                  'VAT',
+                  'Wartość brutto',
+                ],
+                ...estimate.items.map((item) => [
+                  item.name,
+                  item.quantity.toString(),
+                  `${Number(item.unitPrice).toFixed(2)} PLN`,
+                  `${Number(item.taxRate).toFixed(0)}%`,
+                  `${Number(item.totalGross).toFixed(2)} PLN`,
+                ]),
+                [
+                  {
+                    text: 'Suma',
+                    colSpan: 4,
+                    alignment: 'right',
+                    bold: true,
+                  },
+                  {},
+                  {},
+                  {},
+                  {
+                    text: `${Number(estimate.totalGross).toFixed(2)} PLN`,
+                    bold: true,
+                  },
+                ],
               ],
-            ],
+            },
+            layout: 'lightHorizontalLines',
+          },
+        ],
+        styles: {
+          header: {
+            fontSize: 18,
+            bold: true,
+            margin: [0, 0, 0, 15],
           },
         },
-      ],
-      styles: {
-        header: {
-          fontSize: 18,
-          bold: true,
-          margin: [0, 0, 0, 10],
+        defaultStyle: {
+          font: 'Roboto',
+          fontSize: 10,
         },
-      },
-      defaultStyle: {
-        font: 'Roboto',
-      },
-    };
+      };
 
-    const pdfDoc = printer.createPdfKitDocument(docDefinition as any);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=kosztorys_${id}.pdf`,
-    );
-    pdfDoc.pipe(res);
-    pdfDoc.end();
+      const pdf = pdfMake.createPdf(docDefinition);
+      const buffer = await pdf.getBuffer();
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="kosztorys_${id}.pdf"`,
+      );
+      res.setHeader('Content-Length', buffer.length);
+
+      return res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error('Błąd generowania kosztorysu PDF:', error);
+
+      if (!res.headersSent) {
+        return res.status(500).json({
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Nie udało się wygenerować kosztorysu PDF',
+          statusCode: 500,
+        });
+      }
+    }
   }
 }

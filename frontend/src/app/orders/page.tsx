@@ -57,7 +57,7 @@ export default function RepairOrdersPage() {
   const [customersList, setCustomersList] = useState<CustomerOption[]>([]);
   const [vehiclesList, setVehiclesList] = useState<VehicleOption[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<VehicleOption[]>([]);
-  
+
   const [formData, setFormData] = useState({
     customerId: "",
     vehicleId: "",
@@ -121,7 +121,7 @@ export default function RepairOrdersPage() {
       // Auto-select first vehicle if any
       const matching = vehiclesList.filter((v: any) => v.customerId === formData.customerId);
       if (matching.length === 1 && formData.vehicleId === "") {
-        setFormData(prev => ({...prev, vehicleId: matching[0].id}));
+        setFormData(prev => ({ ...prev, vehicleId: matching[0].id }));
       }
     } else {
       setFilteredVehicles(vehiclesList);
@@ -133,35 +133,103 @@ export default function RepairOrdersPage() {
     setIsDialogOpen(true);
   };
 
-  const handleAddOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.customerId || !formData.vehicleId || !formData.reportedIssue) {
-      toast.error("Proszę wypełnić wymagane pola (Klient, Pojazd, Zgłoszony problem).");
+  const handleAddOrder = async () => {
+    const customerId = formData.customerId.trim();
+    const vehicleId = formData.vehicleId.trim();
+    const reportedIssue = formData.reportedIssue.trim();
+
+    if (!customerId || !vehicleId || !reportedIssue) {
+      toast.error(
+        "Wypełnij wymagane pola: klient, pojazd i opis problemu."
+      );
       return;
     }
-    
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: formData.customerId,
-          vehicleId: formData.vehicleId,
-          reportedIssue: formData.reportedIssue,
-          estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
-        }),
-      });
-      if (response.ok) {
-        setIsDialogOpen(false);
-        setFormData({ customerId: "", vehicleId: "", reportedIssue: "", estimatedCost: "" });
-        await fetchOrders();
-        toast.success("Zlecenie naprawy zostało pomyślnie utworzone.");
-      } else {
-        toast.error("Wystąpił błąd podczas dodawania zlecenia.");
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      toast.error("Brak tokenu. Zaloguj się ponownie.");
+      return;
+    }
+
+    const payload: {
+      customerId: string;
+      vehicleId: string;
+      reportedIssue: string;
+      estimatedCost?: number;
+    } = {
+      customerId,
+      vehicleId,
+      reportedIssue,
+    };
+
+    if (formData.estimatedCost.trim() !== "") {
+      const estimatedCost = Number(formData.estimatedCost);
+
+      if (!Number.isFinite(estimatedCost) || estimatedCost < 0) {
+        toast.error("Szacunkowy koszt musi być poprawną liczbą.");
+        return;
       }
+
+      payload.estimatedCost = estimatedCost;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || ""}/repair-orders`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const responseText = await response.text();
+
+      let responseData: any = null;
+
+      if (responseText.trim()) {
+        try {
+          responseData = JSON.parse(responseText);
+        } catch {
+          responseData = { message: responseText };
+        }
+      }
+
+      if (!response.ok) {
+        const message = Array.isArray(responseData?.message)
+          ? responseData.message.join(", ")
+          : responseData?.message ||
+          `Backend zwrócił HTTP ${response.status}`;
+
+        throw new Error(message);
+      }
+
+      setIsDialogOpen(false);
+
+      setFormData({
+        customerId: "",
+        vehicleId: "",
+        reportedIssue: "",
+        estimatedCost: "",
+      });
+
+      await fetchOrders();
+
+      toast.success("Zlecenie naprawy zostało utworzone.");
     } catch (error) {
-      toast.error("Błąd połączenia z serwerem. Czy backend działa?");
+      console.error("Create repair order failed:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Nie udało się utworzyć zlecenia."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -169,7 +237,7 @@ export default function RepairOrdersPage() {
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
-      
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -178,7 +246,7 @@ export default function RepairOrdersPage() {
           </h1>
           <p className="text-zinc-400 mt-2 text-lg">Zarządzaj i śledź statusy napraw pojazdów.</p>
         </div>
-        
+
         {canCreateOrder && (
           <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
             <Plus className="mr-2 h-4 w-4" /> Nowe Zlecenie
@@ -195,10 +263,10 @@ export default function RepairOrdersPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="customerId" className="text-zinc-300">Klient <span className="text-red-500">*</span></Label>
-                <select 
-                  id="customerId" 
+                <select
+                  id="customerId"
                   value={formData.customerId}
-                  onChange={e => setFormData({...formData, customerId: e.target.value, vehicleId: ""})}
+                  onChange={e => setFormData({ ...formData, customerId: e.target.value, vehicleId: "" })}
                   className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100"
                 >
                   <option value="">-- Wybierz klienta --</option>
@@ -209,10 +277,10 @@ export default function RepairOrdersPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="vehicleId" className="text-zinc-300">Pojazd <span className="text-red-500">*</span></Label>
-                <select 
-                  id="vehicleId" 
+                <select
+                  id="vehicleId"
                   value={formData.vehicleId}
-                  onChange={e => setFormData({...formData, vehicleId: e.target.value})}
+                  onChange={e => setFormData({ ...formData, vehicleId: e.target.value })}
                   disabled={!formData.customerId}
                   className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100 disabled:opacity-50"
                 >
@@ -224,23 +292,23 @@ export default function RepairOrdersPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="reportedIssue" className="text-zinc-300">Zgłaszana usterka / Opis</Label>
-                <textarea 
-                  id="reportedIssue" 
+                <textarea
+                  id="reportedIssue"
                   rows={3}
                   value={formData.reportedIssue}
-                  onChange={e => setFormData({...formData, reportedIssue: e.target.value})}
+                  onChange={e => setFormData({ ...formData, reportedIssue: e.target.value })}
                   className="flex w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100 resize-none"
                   placeholder="Krótki opis problemu zgłaszanego przez klienta..."
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="estimatedCost" className="text-zinc-300">Szacunkowy koszt (PLN)</Label>
-                <Input 
-                  id="estimatedCost" 
+                <Input
+                  id="estimatedCost"
                   type="number"
                   value={formData.estimatedCost}
-                  onChange={e => setFormData({...formData, estimatedCost: e.target.value})}
-                  className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" 
+                  onChange={e => setFormData({ ...formData, estimatedCost: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500"
                   placeholder="Np. 500"
                 />
               </div>
@@ -263,9 +331,9 @@ export default function RepairOrdersPage() {
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
           <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
-            <input 
+            <input
               type="text"
-              placeholder="Szukaj po nr rej. lub nazwisku..." 
+              placeholder="Szukaj po nr rej. lub nazwisku..."
               className="pl-10 w-full bg-zinc-900/50 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-xl px-3 py-2"
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
@@ -307,21 +375,20 @@ export default function RepairOrdersPage() {
                 </tr>
               ) : (
                 orders.map((order) => (
-                  <tr 
-                    key={order.id} 
+                  <tr
+                    key={order.id}
                     className="group hover:bg-zinc-800/30 transition-colors duration-200 cursor-pointer"
                   >
                     <td className="px-6 py-4 font-mono text-xs text-zinc-400">
                       #{order.id.substring(0, 8).toUpperCase()}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-sm ${
-                        order.status === 'NEW' ? 'bg-zinc-800 text-zinc-300 border-zinc-700' :
-                        order.status === 'DIAGNOSING' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                        order.status === 'REPAIRING' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                        order.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                        'bg-zinc-800 text-zinc-400 border-zinc-700'
-                      }`}>
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-sm ${order.status === 'NEW' ? 'bg-zinc-800 text-zinc-300 border-zinc-700' :
+                          order.status === 'DIAGNOSING' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                            order.status === 'REPAIRING' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                              order.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                'bg-zinc-800 text-zinc-400 border-zinc-700'
+                        }`}>
                         {
                           {
                             "NEW": "NOWE", "WAITING": "OCZEKUJE", "DIAGNOSING": "DIAGNOZA",
@@ -349,7 +416,7 @@ export default function RepairOrdersPage() {
                       {new Date(order.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link 
+                      <Link
                         href={`/orders/${order.id}`}
                         className="inline-flex h-9 items-center justify-center whitespace-nowrap text-sm font-medium text-zinc-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-full px-4 transition-colors"
                       >
@@ -362,10 +429,10 @@ export default function RepairOrdersPage() {
             </tbody>
           </table>
         </div>
-        <PaginationControls 
-          page={pagination.page} 
-          totalPages={pagination.totalPages} 
-          onPageChange={handlePageChange} 
+        <PaginationControls
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={handlePageChange}
         />
       </GlassCard>
     </div>

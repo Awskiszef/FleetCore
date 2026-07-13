@@ -13,6 +13,7 @@ import { SettingsModule } from '../settings/settings.module';
     UsersModule,
     SettingsModule,
     JwtModule.registerAsync({
+      global: true,
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
@@ -23,5 +24,6 @@ import { SettingsModule } from '../settings/settings.module';
   ],
   providers: [AuthService],
   controllers: [AuthController],
+  exports: [JwtModule],
 })
-export class AuthModule {}
+export class AuthModule { }

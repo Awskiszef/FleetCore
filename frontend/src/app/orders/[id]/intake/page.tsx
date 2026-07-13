@@ -23,24 +23,52 @@ export default function IntakeProtocolPage() {
     damages: "",
     equipment: "",
   });
-
   const fetchIntake = async () => {
+    setIsLoading(true);
+
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/intakes/repair-order/${params.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data) {
-          setIntake(data);
-          setFormData({
-            mileage: data.mileage?.toString() || "",
-            fuelLevel: data.fuelLevel?.toString() || "50",
-            damages: data.damages || "",
-            equipment: data.equipment || "",
-          });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || ""}/intakes/repair-order/${params.id}`
+      );
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          setIntake(null);
+          return;
         }
+
+        throw new Error(
+          `Nie udało się pobrać protokołu: HTTP ${res.status}`
+        );
       }
-    } catch (e) {
-      console.error(e);
+
+      const responseText = await res.text();
+
+      if (!responseText.trim()) {
+        setIntake(null);
+        return;
+      }
+
+      const data = JSON.parse(responseText);
+
+      if (!data) {
+        setIntake(null);
+        return;
+      }
+
+      setIntake(data);
+
+      setFormData({
+        mileage: data.mileage?.toString() || "",
+        fuelLevel: data.fuelLevel?.toString() || "50",
+        damages: data.damages || "",
+        equipment: data.equipment || "",
+      });
+    } catch (error) {
+      console.error("Failed to fetch intake:", error);
+      setIntake(null);
+
+      toast.error("Nie udało się pobrać protokołu przyjęcia.");
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +85,7 @@ export default function IntakeProtocolPage() {
       // But we just use POST in our controller. If it exists, backend should handle it or we use PATCH.
       // Since I didn't add update in backend IntakesController, let's just do POST and if it fails, maybe show error.
       // Actually we should just allow POST once.
-      
+
       if (intake) {
         toast.info("Protokół został już utworzony. Opcja edycji wkrótce.");
         setIsSaving(false);
@@ -106,19 +134,19 @@ export default function IntakeProtocolPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="grid gap-2">
             <Label className="text-zinc-300">Przebieg (km)</Label>
-            <Input type="number" value={formData.mileage} onChange={e => setFormData({...formData, mileage: e.target.value})} className="bg-zinc-900 border-zinc-800" disabled={!!intake} />
+            <Input type="number" value={formData.mileage} onChange={e => setFormData({ ...formData, mileage: e.target.value })} className="bg-zinc-900 border-zinc-800" disabled={!!intake} />
           </div>
           <div className="grid gap-2">
             <Label className="text-zinc-300">Poziom Paliwa ({formData.fuelLevel}%)</Label>
-            <input type="range" min="0" max="100" step="5" value={formData.fuelLevel} onChange={e => setFormData({...formData, fuelLevel: e.target.value})} className="w-full accent-blue-500 mt-2" disabled={!!intake} />
+            <input type="range" min="0" max="100" step="5" value={formData.fuelLevel} onChange={e => setFormData({ ...formData, fuelLevel: e.target.value })} className="w-full accent-blue-500 mt-2" disabled={!!intake} />
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label className="text-zinc-300">Uszkodzenia zewnętrzne (rysy, wgniecenia)</Label>
-            <textarea value={formData.damages} onChange={e => setFormData({...formData, damages: e.target.value})} className="bg-zinc-900 border border-zinc-800 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]" disabled={!!intake} />
+            <textarea value={formData.damages} onChange={e => setFormData({ ...formData, damages: e.target.value })} className="bg-zinc-900 border border-zinc-800 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]" disabled={!!intake} />
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label className="text-zinc-300">Pozostawione wyposażenie (np. dowód rejestracyjny, fotelik)</Label>
-            <textarea value={formData.equipment} onChange={e => setFormData({...formData, equipment: e.target.value})} className="bg-zinc-900 border border-zinc-800 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]" disabled={!!intake} />
+            <textarea value={formData.equipment} onChange={e => setFormData({ ...formData, equipment: e.target.value })} className="bg-zinc-900 border border-zinc-800 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]" disabled={!!intake} />
           </div>
         </div>
 

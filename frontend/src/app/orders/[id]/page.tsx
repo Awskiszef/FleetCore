@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { downloadAuthenticatedFile } from "@/lib/download-auth-file";
 
 interface RepairOrder {
   id: string;
@@ -41,7 +42,7 @@ export default function RepairOrderProfilePage() {
   const { user } = useAuth();
   const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
   const canManageInvoices = isAdminOrOwner || user?.role === 'RECEPTIONIST';
-  
+
   const params = useParams();
   const router = useRouter();
   const [order, setOrder] = useState<RepairOrder | null>(null);
@@ -52,7 +53,7 @@ export default function RepairOrderProfilePage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
-  
+
   // Delete State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -96,13 +97,28 @@ export default function RepairOrderProfilePage() {
 
   const fetchMechanics = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/users`);
-      if (res.ok) {
-        const users = await res.json();
-        setMechanics(users.filter((u: any) => u.role === 'MECHANIC'));
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || ''}/users?limit=100`
+      );
+
+      if (!res.ok) {
+        throw new Error(`Nie udało się pobrać użytkowników: HTTP ${res.status}`);
       }
-    } catch (e) {
-      console.error(e);
+
+      const response = await res.json();
+
+      const users = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data)
+          ? response.data
+          : [];
+
+      setMechanics(
+        users.filter((user: any) => user.role === "MECHANIC")
+      );
+    } catch (error) {
+      console.error("Failed to fetch mechanics:", error);
+      setMechanics([]);
     }
   };
 
@@ -113,7 +129,7 @@ export default function RepairOrderProfilePage() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}`);
         if (res.ok) {
           const data = await res.json();
-          
+
           // Check if invoice still exists in inFakt (if we have one)
           if (data.invoiceId) {
             try {
@@ -129,7 +145,7 @@ export default function RepairOrderProfilePage() {
               console.error("Failed to check invoice status", e);
             }
           }
-          
+
           setOrder(data);
         } else {
           throw new Error("Failed to fetch order");
@@ -212,7 +228,7 @@ export default function RepairOrderProfilePage() {
       const partsCost = order.parts.reduce((sum, p) => sum + (p.priceAtUsage * p.quantity), 0);
       const labor = parseFloat(editForm.laborCost) || 0;
       const margin = parseFloat(editForm.marginPercentage) || 0;
-      
+
       const newFinal = labor + (partsCost * (1 + margin / 100));
       if (!isNaN(newFinal)) {
         setEditForm(prev => ({ ...prev, finalCost: newFinal.toFixed(2) }));
@@ -275,29 +291,39 @@ export default function RepairOrderProfilePage() {
   };
 
   const handleDownloadInvoice = async () => {
+    if (!params.id) {
+      toast.error("Brak identyfikatora zlecenia.");
+      return;
+    }
+
+    const orderId = String(params.id);
+
     setIsDownloadingInvoice(true);
-    toast.info("Pobieranie faktury...", { id: "download-invoice" });
+
+    toast.info("Pobieranie faktury...", {
+      id: "download-invoice",
+    });
+
     try {
-      // Pobranie pliku z wykorzystaniem api-interceptor, który dołączy nagłówek z JWT
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/invoice-pdf`);
-      
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `Faktura_${String(params?.id).substring(0,8)}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        toast.success("Faktura pobrana.", { id: "download-invoice" });
-      } else {
-        toast.error("Nie udało się pobrać faktury. Serwer odrzucił żądanie.", { id: "download-invoice" });
-      }
+      await downloadAuthenticatedFile(
+        `${process.env.NEXT_PUBLIC_API_URL || ""}/repair-orders/${orderId}/invoice-pdf`,
+        `Faktura_${orderId.substring(0, 8)}.pdf`,
+      );
+
+      toast.success("Faktura została pobrana.", {
+        id: "download-invoice",
+      });
     } catch (error) {
-      console.error(error);
-      toast.error("Błąd połączenia podczas pobierania faktury.", { id: "download-invoice" });
+      console.error("Invoice download failed:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Nie udało się pobrać faktury.",
+        {
+          id: "download-invoice",
+        },
+      );
     } finally {
       setIsDownloadingInvoice(false);
     }
@@ -391,7 +417,7 @@ export default function RepairOrderProfilePage() {
       toast.error("Zlecenie musi mieć wpisany koszt końcowy, aby wystawić fakturę.");
       return;
     }
-    
+
     setIsGeneratingInvoice(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/repair-orders/${params.id}/invoice`, {
@@ -452,11 +478,11 @@ export default function RepairOrderProfilePage() {
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
-      
+
       {/* Navigation */}
       <div>
         <Link href="/orders" className="inline-flex items-center text-sm font-medium text-zinc-400 hover:text-emerald-400 transition-colors mb-4 group">
-          <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" /> 
+          <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
           Wróć do listy zleceń
         </Link>
       </div>
@@ -470,13 +496,12 @@ export default function RepairOrderProfilePage() {
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-600 flex items-center gap-4">
               Zlecenie #{order.id.substring(0, 8).toUpperCase()}
-              <span className={`text-sm px-3 py-1 rounded-full border shadow-sm ${
-                order.status === 'NEW' ? 'bg-zinc-800 text-zinc-300 border-zinc-700' :
+              <span className={`text-sm px-3 py-1 rounded-full border shadow-sm ${order.status === 'NEW' ? 'bg-zinc-800 text-zinc-300 border-zinc-700' :
                 order.status === 'DIAGNOSING' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                order.status === 'REPAIRING' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                order.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                'bg-zinc-800 text-zinc-400 border-zinc-700'
-              }`}>
+                  order.status === 'REPAIRING' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                    order.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                      'bg-zinc-800 text-zinc-400 border-zinc-700'
+                }`}>
                 {
                   {
                     "NEW": "NOWE", "WAITING": "OCZEKUJE", "DIAGNOSING": "DIAGNOZA",
@@ -491,7 +516,7 @@ export default function RepairOrderProfilePage() {
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Link href={`/orders/${order.id}/intake`} className="border border-blue-500/30 text-blue-400 bg-transparent hover:bg-blue-500/10 hover:text-blue-300 transition-colors rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium">
             <CheckCircle2 className="mr-2 h-4 w-4" /> Protokół
@@ -502,11 +527,11 @@ export default function RepairOrderProfilePage() {
           <Button onClick={openEditDialog} className="border border-emerald-500/30 text-emerald-400 bg-transparent hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors rounded-full px-4 h-9 inline-flex items-center justify-center text-sm font-medium">
             <Edit className="mr-2 h-4 w-4" /> Edytuj
           </Button>
-          
+
           {(order.customer?.companyName || order.customer?.nip) && canManageInvoices && (
             order.invoiceId ? (
               <div className="flex items-center gap-2">
-                <select 
+                <select
                   onChange={(e) => handleUpdateInvoiceStatus(e.target.value)}
                   disabled={isUpdatingInvoice}
                   className="bg-indigo-900/50 text-indigo-200 border border-indigo-500/30 rounded-full px-3 h-9 text-sm focus-visible:outline-none"
@@ -572,7 +597,7 @@ export default function RepairOrderProfilePage() {
           <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
             <div className="grid gap-2">
               <Label htmlFor="status" className="text-zinc-300">Status</Label>
-              <select id="status" value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})} className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500">
+              <select id="status" value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500">
                 <option value="NEW">NOWE (NEW)</option>
                 <option value="DIAGNOSING">DIAGNOSTYKA (DIAGNOSING)</option>
                 <option value="REPAIRING">W TRAKCIE NAPRAWY (REPAIRING)</option>
@@ -581,7 +606,7 @@ export default function RepairOrderProfilePage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="assignedMechanicId" className="text-zinc-300">Przypisany Mechanik</Label>
-              <select id="assignedMechanicId" value={editForm.assignedMechanicId} onChange={e => setEditForm({...editForm, assignedMechanicId: e.target.value})} className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500">
+              <select id="assignedMechanicId" value={editForm.assignedMechanicId} onChange={e => setEditForm({ ...editForm, assignedMechanicId: e.target.value })} className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500">
                 <option value="">-- Brak / Nieprzypisany --</option>
                 {mechanics.map(m => (
                   <option key={m.id} value={m.id}>{m.fullName}</option>
@@ -590,32 +615,32 @@ export default function RepairOrderProfilePage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="reportedIssue" className="text-zinc-300">Zgłoszony problem</Label>
-              <textarea id="reportedIssue" value={editForm.reportedIssue} onChange={e => setEditForm({...editForm, reportedIssue: e.target.value})} className="flex w-full rounded-md px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 text-zinc-100 min-h-[80px]" />
+              <textarea id="reportedIssue" value={editForm.reportedIssue} onChange={e => setEditForm({ ...editForm, reportedIssue: e.target.value })} className="flex w-full rounded-md px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 text-zinc-100 min-h-[80px]" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="diagnosis" className="text-zinc-300">Diagnoza warsztatu</Label>
-              <textarea id="diagnosis" value={editForm.diagnosis} onChange={e => setEditForm({...editForm, diagnosis: e.target.value})} className="flex w-full rounded-md px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 text-zinc-100 min-h-[80px]" />
+              <textarea id="diagnosis" value={editForm.diagnosis} onChange={e => setEditForm({ ...editForm, diagnosis: e.target.value })} className="flex w-full rounded-md px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 text-zinc-100 min-h-[80px]" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="mechanicNotes" className="text-zinc-300">Notatki mechanika / Zakres prac</Label>
-              <textarea id="mechanicNotes" value={editForm.mechanicNotes} onChange={e => setEditForm({...editForm, mechanicNotes: e.target.value})} className="flex w-full rounded-md px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 text-zinc-100 min-h-[80px]" />
+              <textarea id="mechanicNotes" value={editForm.mechanicNotes} onChange={e => setEditForm({ ...editForm, mechanicNotes: e.target.value })} className="flex w-full rounded-md px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 text-zinc-100 min-h-[80px]" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2 col-span-2 md:col-span-1">
                 <Label htmlFor="editEstimatedCost" className="text-zinc-300">Szacowany Koszt (PLN)</Label>
-                <Input id="editEstimatedCost" type="number" value={editForm.estimatedCost} onChange={e => setEditForm({...editForm, estimatedCost: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" />
+                <Input id="editEstimatedCost" type="number" value={editForm.estimatedCost} onChange={e => setEditForm({ ...editForm, estimatedCost: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" />
               </div>
               <div className="grid gap-2 col-span-2 md:col-span-1">
                 <Label htmlFor="editLaborCost" className="text-zinc-300">Robocizna (PLN)</Label>
-                <Input id="editLaborCost" type="number" value={editForm.laborCost} onChange={e => setEditForm({...editForm, laborCost: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" />
+                <Input id="editLaborCost" type="number" value={editForm.laborCost} onChange={e => setEditForm({ ...editForm, laborCost: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" />
               </div>
               <div className="grid gap-2 col-span-2 md:col-span-1">
                 <Label htmlFor="editMargin" className="text-zinc-300">Marża na częściach (%)</Label>
-                <Input id="editMargin" type="number" value={editForm.marginPercentage} onChange={e => setEditForm({...editForm, marginPercentage: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" placeholder="np. 20" />
+                <Input id="editMargin" type="number" value={editForm.marginPercentage} onChange={e => setEditForm({ ...editForm, marginPercentage: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-emerald-500" placeholder="np. 20" />
               </div>
               <div className="grid gap-2 col-span-2 md:col-span-1">
                 <Label htmlFor="editFinalCost" className="text-zinc-300 font-bold text-emerald-400">Koszt Końcowy (PLN)</Label>
-                <Input id="editFinalCost" type="number" value={editForm.finalCost} onChange={e => setEditForm({...editForm, finalCost: e.target.value})} className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 focus-visible:ring-emerald-500 font-bold" />
+                <Input id="editFinalCost" type="number" value={editForm.finalCost} onChange={e => setEditForm({ ...editForm, finalCost: e.target.value })} className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 focus-visible:ring-emerald-500 font-bold" />
                 <span className="text-xs text-zinc-500">Wyliczany automatycznie, ale możesz go nadpisać.</span>
               </div>
             </div>
@@ -632,7 +657,7 @@ export default function RepairOrderProfilePage() {
       </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
-        
+
         {/* Left Column (Entities) */}
         <div className="flex flex-col gap-6 lg:col-span-1">
           {/* Pojazd Card */}
@@ -640,7 +665,7 @@ export default function RepairOrderProfilePage() {
             <h2 className="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-2 flex items-center gap-2">
               <Car className="w-5 h-5 text-emerald-500" /> Dotyczy Pojazdu
             </h2>
-            
+
             {order.vehicle ? (
               <div className="flex flex-col gap-3 mt-2">
                 <div className="font-bold text-zinc-100 text-lg">{order.vehicle.make} {order.vehicle.model}</div>
@@ -666,7 +691,7 @@ export default function RepairOrderProfilePage() {
             <h2 className="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-2 flex items-center gap-2">
               <User className="w-5 h-5 text-emerald-500" /> Klient (Zlecający)
             </h2>
-            
+
             {order.customer ? (
               <div className="flex flex-col gap-3 mt-2">
                 <div className="font-bold text-zinc-100 text-lg">{order.customer.fullName}</div>
@@ -692,7 +717,7 @@ export default function RepairOrderProfilePage() {
             <h2 className="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-2 flex items-center gap-2">
               <User className="w-5 h-5 text-amber-500" /> Przypisany Mechanik
             </h2>
-            
+
             {order.assignedMechanic ? (
               <div className="flex flex-col gap-3 mt-2">
                 <div className="font-bold text-zinc-100 text-lg">{order.assignedMechanic.fullName}</div>
@@ -708,7 +733,7 @@ export default function RepairOrderProfilePage() {
               Szacowany Koszt
             </h2>
             <div className="text-4xl font-black text-emerald-400 mt-2 tracking-tight">
-          {order.estimatedCost ? `${order.estimatedCost.toLocaleString()} PLN` : "---"}
+              {order.estimatedCost ? `${order.estimatedCost.toLocaleString()} PLN` : "---"}
             </div>
           </GlassCard>
         </div>
@@ -738,7 +763,7 @@ export default function RepairOrderProfilePage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex flex-col gap-3">
               <h3 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-zinc-400" /> Zgłoszony Problem
@@ -778,7 +803,7 @@ export default function RepairOrderProfilePage() {
                 <Plus className="mr-2 h-4 w-4" /> Dodaj część
               </Button>
             </div>
-            
+
             <div className="space-y-3">
               {order.parts && order.parts.length > 0 ? (
                 order.parts.map((item, idx) => (
@@ -806,7 +831,7 @@ export default function RepairOrderProfilePage() {
                   Brak przypisanych części do tego zlecenia.
                 </div>
               )}
-              
+
               {order.parts && order.parts.length > 0 && (
                 <div className="flex justify-end p-4 mt-2">
                   <div className="text-right">
@@ -828,9 +853,9 @@ export default function RepairOrderProfilePage() {
               <ImageIcon className="h-5 w-5 text-indigo-500" /> Zdjęcia / Dokumentacja
             </h2>
             <div className="relative">
-              <input 
-                type="file" 
-                accept="image/*" 
+              <input
+                type="file"
+                accept="image/*"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 onChange={handleFileUpload}
                 disabled={isUploading}
@@ -841,7 +866,7 @@ export default function RepairOrderProfilePage() {
               </Button>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
             {attachments.length > 0 ? (
               attachments.map((att, idx) => {

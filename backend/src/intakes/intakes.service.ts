@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class IntakesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createIntakeDto: CreateIntakeDto, userId: string) {
     return this.prisma.vehicleIntake.create({
@@ -16,9 +16,11 @@ export class IntakesService {
   }
 
   async findByRepairOrder(repairOrderId: string) {
-    return this.prisma.vehicleIntake.findUnique({
+    const intake = await this.prisma.vehicleIntake.findUnique({
       where: { repairOrderId },
     });
+
+    return intake ?? {};
   }
 
   async findOne(id: string) {

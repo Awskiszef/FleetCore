@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define TypeScript interfaces based on Prisma schema
 interface Customer {
@@ -28,7 +29,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const { user } = useAuth();
   const canAddCustomer = user?.role === 'ADMIN' || user?.role === 'OWNER' || user?.role === 'RECEPTIONIST';
 
@@ -58,7 +59,7 @@ export default function CustomersPage() {
       const page = Number(searchParams.get("page")) || 1;
       const search = searchParams.get("search") || "";
       const result = await apiClient.getCustomers({ page, limit: 20, search });
-      setCustomers(result.data);
+      setCustomers(result.data as Customer[]);
       setPagination({ page: result.page, limit: result.limit, totalPages: result.totalPages });
     } catch (error) {
       toast.error("Nie udało się pobrać bazy klientów.");
@@ -95,7 +96,7 @@ export default function CustomersPage() {
       toast.error("Wprowadź prawidłowy NIP (min. 10 znaków).");
       return;
     }
-    
+
     setIsFetchingNip(true);
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers/fetch-nip/${formData.nip.replace(/\D/g, '')}`);
@@ -121,7 +122,7 @@ export default function CustomersPage() {
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/customers`, {
         method: "POST",
@@ -137,7 +138,7 @@ export default function CustomersPage() {
           phone: formData.phone || undefined,
         }),
       });
-      
+
       if (response.ok) {
         setIsDialogOpen(false);
         setFormData({ type: "individual", firstName: "", lastName: "", companyName: "", nip: "", address: "", email: "", phone: "" });
@@ -155,7 +156,7 @@ export default function CustomersPage() {
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
-      
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -164,7 +165,7 @@ export default function CustomersPage() {
           </h1>
           <p className="text-zinc-400 mt-2 text-lg">Zarządzaj bazą klientów Twojego warsztatu.</p>
         </div>
-        
+
         {canAddCustomer && (
           <Button onClick={() => setIsDialogOpen(true)} className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium shadow-lg shadow-cyan-500/25 transition-all duration-300 hover:scale-105 rounded-full px-6 h-10 inline-flex items-center justify-center border-0">
             <Plus className="mr-2 h-4 w-4" /> Nowy Klient
@@ -177,9 +178,9 @@ export default function CustomersPage() {
         {/* Search Bar */}
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
-          <Input 
+          <Input
             type="text"
-            placeholder="Szukaj klienta po nazwisku lub e-mailu..." 
+            placeholder="Szukaj klienta po nazwisku lub e-mailu..."
             className="pl-10 bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-cyan-500 rounded-xl"
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
@@ -200,10 +201,10 @@ export default function CustomersPage() {
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
                     <Label className="text-zinc-300">Typ Klienta</Label>
-                    <select 
+                    <select
                       className="flex h-9 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500 text-zinc-100"
                       value={formData.type}
-                      onChange={(e) => setFormData({...formData, type: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     >
                       <option value="individual">Osoba prywatna</option>
                       <option value="company">Firma (Polska)</option>
@@ -216,7 +217,7 @@ export default function CustomersPage() {
                       <div className="grid gap-2">
                         <Label htmlFor="nip" className="text-zinc-300">NIP</Label>
                         <div className="flex gap-2">
-                          <Input id="nip" value={formData.nip} onChange={e => setFormData({...formData, nip: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="np. 1234567890" />
+                          <Input id="nip" value={formData.nip} onChange={e => setFormData({ ...formData, nip: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="np. 1234567890" />
                           {formData.type === "company" && (
                             <Button type="button" onClick={handleFetchNip} disabled={isFetchingNip} className="bg-zinc-800 hover:bg-zinc-700 text-cyan-400 border border-cyan-500/30 whitespace-nowrap">
                               {isFetchingNip ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCode className="h-4 w-4 mr-2" />}
@@ -227,7 +228,7 @@ export default function CustomersPage() {
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="companyName" className="text-zinc-300">Nazwa Firmy</Label>
-                        <Input id="companyName" value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+                        <Input id="companyName" value={formData.companyName} onChange={e => setFormData({ ...formData, companyName: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
                       </div>
                     </>
                   )}
@@ -235,31 +236,31 @@ export default function CustomersPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="firstName" className="text-zinc-300">Imię</Label>
-                      <Input id="firstName" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" required />
+                      <Input id="firstName" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" required />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="lastName" className="text-zinc-300">Nazwisko</Label>
-                      <Input id="lastName" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" required />
+                      <Input id="lastName" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" required />
                     </div>
                   </div>
 
                   <div className="grid gap-2">
                     <Label htmlFor="email" className="text-zinc-300">Email</Label>
-                    <Input id="email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+                    <Input id="email" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
                   </div>
 
                   <div className="grid gap-2">
                     <Label htmlFor="phone" className="text-zinc-300">Telefon</Label>
-                    <Input id="phone" type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
+                    <Input id="phone" type="tel" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" />
                   </div>
 
                   <div className="grid gap-2">
                     <Label htmlFor="address" className="text-zinc-300">Adres</Label>
-                    <Input id="address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="Ulica, kod pocztowy, miasto" />
+                    <Input id="address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} className="bg-zinc-900 border-zinc-800 focus-visible:ring-cyan-500" placeholder="Ulica, kod pocztowy, miasto" />
                   </div>
                 </div>
                 <DialogFooter>
-                  <DialogClose asChild>
+                  <DialogClose>
                     <Button type="button" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
                       Anuluj
                     </Button>
@@ -295,8 +296,8 @@ export default function CustomersPage() {
                 </tr>
               ) : (
                 customers.map((customer) => (
-                  <tr 
-                    key={customer.id} 
+                  <tr
+                    key={customer.id}
                     className="group hover:bg-zinc-800/30 transition-colors duration-200 cursor-pointer"
                   >
                     <td className="px-6 py-4">
@@ -337,7 +338,7 @@ export default function CustomersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link 
+                      <Link
                         href={`/customers/${customer.id}`}
                         className="inline-flex h-9 items-center justify-center whitespace-nowrap text-sm font-medium text-zinc-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-full px-4 transition-colors"
                       >
@@ -350,10 +351,10 @@ export default function CustomersPage() {
             </tbody>
           </table>
         </div>
-        <PaginationControls 
-          page={pagination.page} 
-          totalPages={pagination.totalPages} 
-          onPageChange={handlePageChange} 
+        <PaginationControls
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={handlePageChange}
         />
       </GlassCard>
     </div>

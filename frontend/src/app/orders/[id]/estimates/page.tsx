@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { downloadAuthenticatedFile } from "@/lib/download-auth-file";
 
 export default function EstimatesPage() {
   const params = useParams();
@@ -39,7 +40,31 @@ export default function EstimatesPage() {
   }, [params.id]);
 
   const handleDownloadPdf = async (id: string) => {
-    window.open(`${process.env.NEXT_PUBLIC_API_URL || ''}/estimates/${id}/pdf`, "_blank");
+    try {
+      toast.info("Pobieranie kosztorysu...", {
+        id: "download-estimate",
+      });
+
+      await downloadAuthenticatedFile(
+        `${process.env.NEXT_PUBLIC_API_URL || ""}/estimates/${id}/pdf`,
+        `Kosztorys_${id.substring(0, 8)}.pdf`,
+      );
+
+      toast.success("Kosztorys został pobrany.", {
+        id: "download-estimate",
+      });
+    } catch (error) {
+      console.error("Estimate download failed:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Nie udało się pobrać kosztorysu.",
+        {
+          id: "download-estimate",
+        },
+      );
+    }
   };
 
   const handleSaveEstimate = async () => {
