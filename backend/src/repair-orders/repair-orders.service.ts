@@ -11,6 +11,17 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { createPaginatedResponse } from '../common/pagination/paginated-response';
 
+const TRANSITIONS: Record<RepairOrderStatus, RepairOrderStatus[]> = {
+  NEW: ['WAITING', 'DIAGNOSING', 'CANCELLED'],
+  WAITING: ['DIAGNOSING', 'CANCELLED'],
+  DIAGNOSING: ['REPAIRING', 'WAITING', 'CANCELLED'],
+  REPAIRING: ['READY', 'CANCELLED'],
+  READY: ['COMPLETED', 'REPAIRING'],
+  COMPLETED: ['DELIVERED'],
+  DELIVERED: [],
+  CANCELLED: [],
+};
+
 @Injectable()
 export class RepairOrdersService {
   private readonly logger = new Logger(RepairOrdersService.name);
@@ -115,7 +126,6 @@ export class RepairOrdersService {
       existingOrder.status === 'COMPLETED' ||
       existingOrder.status === 'DELIVERED';
 
-    // Jeśli zamrożone, upewnijmy się że próbują zmienić TYLKO status (np. cofnąć) lub dodają fakturę
     if (isFrozen) {
       const allowedKeys = ['status', 'invoiceId', 'invoiceUrl'];
       const attemptToChangeFrozenData = Object.keys(data).some(
@@ -128,81 +138,168 @@ export class RepairOrdersService {
       }
     }
 
-    const updatedOrder = await this.prisma.repairOrder.update({
-      where: { id },
-      data,
-      include: {
-        customer: true,
-        vehicle: true,
-        assignedMechanic: true,
-        parts: { include: { part: true } },
-      },
-    });
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      const finalData = { ...data };
+      let notifyStatusChanged: RepairOrderStatus | null = null;
+      let notifyCustomerData: {
+        email: string | null;
+        phone: string | null;
+        fullName: string | null;
+        companyName: string | null;
+        vehiclePlate: string | null;
+        finalCost: number | null;
+      } | null = null;
 
-    if (data.status && data.status !== existingOrder.status) {
-      const status = data.status as RepairOrderStatus;
+      // State machine logic
+      if (finalData.status && finalData.status !== existingOrder.status) {
+        const newStatus = finalData.status as RepairOrderStatus;
 
-      await this.prisma.repairOrderHistory.create({
-        data: {
-          repairOrderId: id,
-          status: status,
-          userId: userId,
-          notes: `Zmiana statusu na ${status}`,
+        if (!TRANSITIONS[existingOrder.status].includes(newStatus)) {
+          throw new BadRequestException(
+            `Niedozwolone przejście ze statusu ${existingOrder.status} do ${newStatus}`,
+          );
+        }
+
+        // Handle CANCELLED: unreserve everything
+        if (newStatus === 'CANCELLED') {
+          for (const p of existingOrder.parts) {
+            await tx.part.update({
+              where: { id: p.partId },
+              data: { reservedQuantity: { decrement: p.quantity } },
+            });
+            await tx.inventoryTransaction.create({
+              data: {
+                partId: p.partId,
+                type: 'UNRESERVE',
+                quantity: p.quantity,
+                repairOrderId: id,
+                userId: userId,
+                notes: 'Anulowanie zlecenia - zwolnienie rezerwacji',
+              },
+            });
+          }
+        }
+
+        // Handle COMPLETED: finalize inventory
+        if (newStatus === 'COMPLETED') {
+          if (!existingOrder.inventoryFinalizedAt) {
+            for (const p of existingOrder.parts) {
+              await tx.part.update({
+                where: { id: p.partId },
+                data: {
+                  quantity: { decrement: p.quantity },
+                  reservedQuantity: { decrement: p.quantity },
+                },
+              });
+              await tx.inventoryTransaction.create({
+                data: {
+                  partId: p.partId,
+                  type: 'OUT',
+                  quantity: p.quantity,
+                  repairOrderId: id,
+                  userId: userId,
+                  notes: 'Zakończenie zlecenia - stałe zdjęcie ze stanu',
+                },
+              });
+            }
+            finalData.inventoryFinalizedAt = new Date();
+          }
+          finalData.completedAt = new Date();
+        }
+
+        notifyStatusChanged = newStatus;
+      }
+
+      // Recalculate cost inside the transaction if laborCost or marginPercentage changed
+      if (
+        finalData.laborCost !== undefined ||
+        finalData.marginPercentage !== undefined
+      ) {
+        const partsCost = existingOrder.parts.reduce(
+          (sum, p) => sum + Number(p.priceAtUsage) * p.quantity,
+          0,
+        );
+        const labor = Number(
+          finalData.laborCost ?? existingOrder.laborCost ?? 0,
+        );
+        const margin = Number(
+          finalData.marginPercentage ?? existingOrder.marginPercentage ?? 0,
+        );
+
+        const newFinal = new Prisma.Decimal(
+          labor + partsCost * (1 + margin / 100),
+        );
+        finalData.finalCost = newFinal;
+      }
+
+      // Update Order
+      const updated = await tx.repairOrder.update({
+        where: { id },
+        data: finalData,
+        include: {
+          customer: true,
+          vehicle: true,
+          assignedMechanic: true,
+          parts: { include: { part: true } },
         },
       });
 
-      // Jeśli przeszło na COMPLETED, zdejmujemy z magazynu trwale to co zarezerwowano
-      if (status === 'COMPLETED' && existingOrder.status !== 'COMPLETED') {
-        for (const p of existingOrder.parts) {
-          await this.prisma.part.update({
-            where: { id: p.partId },
-            data: {
-              quantity: { decrement: p.quantity },
-              reservedQuantity: { decrement: p.quantity },
-            },
-          });
-          await this.prisma.inventoryTransaction.create({
-            data: {
-              partId: p.partId,
-              type: 'OUT',
-              quantity: p.quantity,
-              repairOrderId: id,
-              userId: userId,
-              notes: 'Zakończenie zlecenia - stałe zdjęcie ze stanu',
-            },
-          });
-        }
+      // Insert History
+      if (notifyStatusChanged) {
+        await tx.repairOrderHistory.create({
+          data: {
+            repairOrderId: id,
+            status: notifyStatusChanged,
+            userId: userId,
+            notes: `Zmiana statusu na ${notifyStatusChanged}`,
+          },
+        });
+
+        notifyCustomerData = {
+          email: existingOrder.customer?.email ?? null,
+          phone: existingOrder.customer?.phone ?? null,
+          fullName: existingOrder.customer?.fullName ?? null,
+          companyName: existingOrder.customer?.companyName ?? null,
+          vehiclePlate: existingOrder.vehicle?.licensePlate ?? null,
+          finalCost: updated.finalCost ? Number(updated.finalCost) : null,
+        };
       }
 
-      // Powiadomienia
-      const customer = existingOrder.customer;
-      const vehicle = existingOrder.vehicle;
+      return { updated, notifyStatusChanged, notifyCustomerData };
+    });
 
-      if (customer) {
-        let message = `Witaj ${customer.fullName || customer.companyName}! Twoje zlecenie naprawy (Pojazd: ${vehicle?.licensePlate || ''}) zmieniło status na: ${status}.`;
+    const {
+      updated: updatedOrder,
+      notifyStatusChanged,
+      notifyCustomerData,
+    } = txResult;
 
-        if (status === 'COMPLETED') {
-          message = `Dzień dobry! Informujemy, że naprawa pojazdu ${vehicle?.licensePlate || ''} została zakończona. Pojazd jest gotowy do odbioru. Całkowity koszt: ${updatedOrder.finalCost ? Number(updatedOrder.finalCost) : 'do ustalenia'} PLN. Pozdrawiamy, zespół AtlasHC Garage.`;
-        }
+    // Send notifications AFTER transaction is committed
+    if (notifyStatusChanged && notifyCustomerData) {
+      let message = `Witaj ${notifyCustomerData.fullName || notifyCustomerData.companyName || ''}! Twoje zlecenie naprawy (Pojazd: ${notifyCustomerData.vehiclePlate || ''}) zmieniło status na: ${notifyStatusChanged}.`;
 
-        const subject = `Aktualizacja statusu naprawy: ${status}`;
-
-        if (customer.email) {
-          this.notificationsService
-            .sendEmail(customer.email, subject, `<p>${message}</p>`)
-            .catch((e) => this.logger.error(e));
-        }
-        if (customer.phone) {
-          this.notificationsService
-            .sendSms(customer.phone, message)
-            .catch((e) => this.logger.error(e));
-        }
+      if (notifyStatusChanged === 'READY') {
+        message = `Dzień dobry! Informujemy, że naprawa pojazdu ${notifyCustomerData.vehiclePlate || ''} została zakończona. Pojazd oczekuje na odbiór w naszym serwisie. Całkowity koszt: ${notifyCustomerData.finalCost !== null ? notifyCustomerData.finalCost : 'do ustalenia'} PLN. Pozdrawiamy, zespół AtlasHC Garage.`;
+      } else if (notifyStatusChanged === 'COMPLETED') {
+        message = `Dzień dobry! Informujemy, że zlecenie dla pojazdu ${notifyCustomerData.vehiclePlate || ''} zostało pomyślnie sfinalizowane (rozliczone). Dziękujemy za zaufanie! Pozdrawiamy, zespół AtlasHC Garage.`;
       }
-    }
 
-    // Jeśli zmieniono laborCost lub marginPercentage, przelicz ponownie
-    if (data.laborCost !== undefined || data.marginPercentage !== undefined) {
-      await this.recalculateCost(id);
+      const subject = `Aktualizacja statusu naprawy: ${notifyStatusChanged}`;
+
+      if (notifyCustomerData.email) {
+        this.notificationsService
+          .sendEmail(notifyCustomerData.email, subject, `<p>${message}</p>`)
+          .catch((e: unknown) =>
+            this.logger.error(e instanceof Error ? e.message : String(e)),
+          );
+      }
+      if (notifyCustomerData.phone) {
+        this.notificationsService
+          .sendSms(notifyCustomerData.phone, message)
+          .catch((e: unknown) =>
+            this.logger.error(e instanceof Error ? e.message : String(e)),
+          );
+      }
     }
 
     return updatedOrder;
@@ -211,12 +308,42 @@ export class RepairOrdersService {
   async remove(id: string) {
     const existing = await this.prisma.repairOrder.findUnique({
       where: { id },
+      include: { parts: true },
     });
     if (!existing) throw new NotFoundException();
-    // Jeśli używamy soft delete za pomocą Prisma Extension, to normalne delete zrobi update deletedAt.
-    return this.prisma.repairOrder.delete({
-      where: { id },
+
+    if (existing.status === 'COMPLETED' || existing.status === 'DELIVERED') {
+      throw new ForbiddenException(
+        'Zakończone zlecenie nie może zostać usunięte.',
+      );
+    }
+
+    // Unreserve parts if it is not cancelled
+    await this.prisma.$transaction(async (tx) => {
+      if (existing.status !== 'CANCELLED') {
+        for (const p of existing.parts) {
+          await tx.part.update({
+            where: { id: p.partId },
+            data: { reservedQuantity: { decrement: p.quantity } },
+          });
+          await tx.inventoryTransaction.create({
+            data: {
+              partId: p.partId,
+              type: 'UNRESERVE',
+              quantity: p.quantity,
+              repairOrderId: id,
+              notes: 'Usunięcie zlecenia - zwolnienie rezerwacji',
+            },
+          });
+        }
+      }
+
+      await tx.repairOrder.delete({
+        where: { id },
+      });
     });
+
+    return true;
   }
 
   async addPart(
@@ -229,19 +356,13 @@ export class RepairOrdersService {
       where: { id: orderId },
     });
     if (!order) throw new NotFoundException('Zlecenie nie znalezione');
-    if (order.status === 'COMPLETED' || order.status === 'DELIVERED') {
+    if (
+      order.status === 'COMPLETED' ||
+      order.status === 'DELIVERED' ||
+      order.status === 'CANCELLED'
+    ) {
       throw new ForbiddenException(
-        'Zlecenie zamrożone, nie można dodać części.',
-      );
-    }
-
-    const part = await this.prisma.part.findUnique({ where: { id: partId } });
-    if (!part) throw new NotFoundException('Część nie znaleziona');
-
-    const available = part.quantity - part.reservedQuantity;
-    if (available < quantity) {
-      throw new BadRequestException(
-        `Brak wystarczającej ilości w magazynie. Dostępne: ${available}`,
+        'Zlecenie jest zamrożone (lub anulowane), nie można dodać części.',
       );
     }
 
@@ -256,13 +377,25 @@ export class RepairOrdersService {
       );
     }
 
-    // Rezerwacja
-    await this.prisma.$transaction([
-      this.prisma.part.update({
-        where: { id: partId },
-        data: { reservedQuantity: { increment: quantity } },
-      }),
-      this.prisma.inventoryTransaction.create({
+    const part = await this.prisma.part.findUnique({ where: { id: partId } });
+    if (!part) throw new NotFoundException('Część nie znaleziona');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Race-condition free reservation
+      const updateResult = await tx.$executeRaw`
+        UPDATE "Part" 
+        SET "reservedQuantity" = "reservedQuantity" + ${quantity} 
+        WHERE id = ${partId} 
+        AND ("quantity" - "reservedQuantity") >= ${quantity}
+      `;
+
+      if (updateResult === 0) {
+        throw new BadRequestException(
+          'Brak wystarczającej ilości w magazynie do zrealizowania rezerwacji.',
+        );
+      }
+
+      await tx.inventoryTransaction.create({
         data: {
           partId: partId,
           type: 'RESERVE',
@@ -271,16 +404,17 @@ export class RepairOrdersService {
           userId: userId,
           notes: 'Rezerwacja dla zlecenia',
         },
-      }),
-      this.prisma.repairOrderPart.create({
+      });
+
+      await tx.repairOrderPart.create({
         data: {
           repairOrderId: orderId,
           partId: partId,
           quantity: quantity,
           priceAtUsage: part.unitPrice,
         },
-      }),
-    ]);
+      });
+    });
 
     await this.recalculateCost(orderId);
     return true;
@@ -291,9 +425,13 @@ export class RepairOrdersService {
       where: { id: orderId },
     });
     if (!order) throw new NotFoundException('Zlecenie nie znalezione');
-    if (order.status === 'COMPLETED' || order.status === 'DELIVERED') {
+    if (
+      order.status === 'COMPLETED' ||
+      order.status === 'DELIVERED' ||
+      order.status === 'CANCELLED'
+    ) {
       throw new ForbiddenException(
-        'Zlecenie zamrożone, nie można usuwać części.',
+        'Zlecenie jest zamrożone (lub anulowane), nie można usuwać części.',
       );
     }
 
@@ -304,7 +442,6 @@ export class RepairOrdersService {
     });
     if (!link) return;
 
-    // Zdjęcie rezerwacji
     await this.prisma.$transaction([
       this.prisma.part.update({
         where: { id: partId },
@@ -344,7 +481,9 @@ export class RepairOrdersService {
       const labor = Number(order.laborCost || 0);
       const margin = Number(order.marginPercentage || 0);
 
-      const newFinal = labor + partsCost * (1 + margin / 100);
+      const newFinal = new Prisma.Decimal(
+        labor + partsCost * (1 + margin / 100),
+      );
 
       await this.prisma.repairOrder.update({
         where: { id: orderId },

@@ -1,6 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { FILE_STORAGE, FileStorage } from './storage.service';
+import { FILE_STORAGE } from './storage.service';
+import type { FileStorage } from './storage.service';
 import { AttachmentEntityType } from '@prisma/client';
 
 @Injectable()

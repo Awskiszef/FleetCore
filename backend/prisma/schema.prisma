@@ -116,6 +116,7 @@ model RepairOrder {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   completedAt        DateTime?
+  inventoryFinalizedAt DateTime?
   deletedAt          DateTime?
 
   intakeProtocol     VehicleIntake?

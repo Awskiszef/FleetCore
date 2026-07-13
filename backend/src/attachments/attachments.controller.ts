@@ -22,7 +22,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Roles } from '../auth/roles.decorator';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
-import { FILE_STORAGE, FileStorage } from './storage.service';
+import { FILE_STORAGE } from './storage.service';
+import type { FileStorage } from './storage.service';
 import { AttachmentEntityType } from '@prisma/client';
 import { extname } from 'path';
 
