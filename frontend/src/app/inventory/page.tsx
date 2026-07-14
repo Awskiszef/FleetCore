@@ -14,25 +14,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { apiClient } from "@/lib/api-client";
 
-interface Part {
-  id: string;
-  name: string;
-  oemNumber: string | null;
-  aftermarketNumber: string | null;
-  manufacturer: string | null;
-  supplierId: string | null;
-  supplier: { name: string } | null;
-  unitPrice: number;
-  quantity: number;
-  minQuantity: number;
-  barcode: string | null;
-  shelfLocation: string | null;
-}
-
-interface Supplier {
-  id: string;
-  name: string;
-}
+import { Part, Supplier } from "@/types/models";
 
 export default function InventoryPage() {
   const { user } = useAuth();
@@ -119,7 +101,6 @@ export default function InventoryPage() {
           name: formData.name,
           oemNumber: formData.oemNumber || undefined,
           aftermarketNumber: formData.aftermarketNumber || undefined,
-          manufacturer: formData.manufacturer || undefined,
           manufacturer: formData.manufacturer || undefined,
           supplierId: formData.supplierId || undefined,
           unitPrice: parseFloat(formData.unitPrice),
@@ -236,9 +217,7 @@ export default function InventoryPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">Anuluj</Button>
-              </DialogClose>
+              <DialogClose render={<Button type="button" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">Anuluj</Button>} />
               <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-500 text-white border-0">
                 {isSubmitting ? "Zapisywanie..." : "Zapisz Część"}
               </Button>

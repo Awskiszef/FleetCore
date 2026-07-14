@@ -41,7 +41,8 @@ export class JwtAuthGuard implements CanActivate {
 
       if (
         payload.mustChangePassword &&
-        !request.url.includes('/auth/change-password')
+        !request.url.includes('/auth/change-password') &&
+        !request.url.includes('/auth/me')
       ) {
         throw new ForbiddenException('Musisz zmienić hasło.');
       }

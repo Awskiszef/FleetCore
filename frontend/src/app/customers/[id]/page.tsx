@@ -12,22 +12,17 @@ import { Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-interface Customer {
-  id: string;
-  fullName: string;
-  companyName?: string;
-  nip?: string;
-  address?: string;
-  email: string;
-  phone: string;
+import { Customer } from "@/types/models";
+
+export type CustomerDetail = Customer & {
   vehicles?: any[];
   repairOrders?: any[];
-}
+};
 
 export default function CustomerProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Edit State
@@ -176,8 +171,8 @@ export default function CustomerProfilePage() {
         companyName: customer.companyName || "",
         nip: customer.nip || "",
         address: customer.address || "",
-        email: customer.email,
-        phone: customer.phone,
+        email: customer.email || "",
+        phone: customer.phone || "",
       });
       setIsEditDialogOpen(true);
     }
@@ -485,7 +480,7 @@ export default function CustomerProfilePage() {
                 <Link href={`/vehicles/${vehicle.id}`} key={i} className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 flex flex-col gap-1 hover:border-cyan-500/30 transition-colors cursor-pointer group">
                   <div className="font-bold text-lg group-hover:text-cyan-400 transition-colors">{vehicle.make} {vehicle.model}</div>
                   <div className="text-sm font-mono bg-zinc-950 px-2 py-1 rounded w-fit border border-zinc-800 text-zinc-400 mt-1">
-                    {vehicle.licensePlate}
+                    {vehicle.licensePlate || "Brak"}
                   </div>
                 </Link>
               ))

@@ -14,28 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { apiClient } from "@/lib/api-client";
-interface RepairOrder {
-  id: string;
-  status: string;
-  reportedIssue: string;
-  estimatedCost?: number;
-  finalCost?: number;
-  createdAt: string;
-  customer?: { id: string; fullName: string };
-  vehicle?: { id: string; make: string; model: string; licensePlate: string };
-}
-
-interface CustomerOption {
-  id: string;
-  fullName: string;
-}
-
-interface VehicleOption {
-  id: string;
-  make: string;
-  model: string;
-  licensePlate: string;
-}
+import { Customer, Vehicle, RepairOrder } from "@/types/models";
 
 export default function RepairOrdersPage() {
   const { user } = useAuth();
@@ -54,9 +33,9 @@ export default function RepairOrdersPage() {
   // Add Order Form State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customersList, setCustomersList] = useState<CustomerOption[]>([]);
-  const [vehiclesList, setVehiclesList] = useState<VehicleOption[]>([]);
-  const [filteredVehicles, setFilteredVehicles] = useState<VehicleOption[]>([]);
+  const [customersList, setCustomersList] = useState<Customer[]>([]);
+  const [vehiclesList, setVehiclesList] = useState<Vehicle[]>([]);
+  const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([]);
 
   const [formData, setFormData] = useState({
     customerId: "",
@@ -285,9 +264,8 @@ export default function RepairOrdersPage() {
                   className="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 text-zinc-100 disabled:opacity-50"
                 >
                   <option value="">-- Wybierz pojazd --</option>
-                  {filteredVehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.make} {v.model} ({v.licensePlate})</option>
-                  ))}
+                  {filteredVehicles.map(v => <option key={v.id} value={v.id}>{v.make || "Nieznana"} {v.model || "marka"} - {v.licensePlate || "Brak rejestracji"}</option>
+                  )}
                 </select>
               </div>
               <div className="grid gap-2">
