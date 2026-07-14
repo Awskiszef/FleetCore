@@ -219,5 +219,6 @@ describe('AuthController', () => {
       access_token: 'new-token',
       user: { id: 'user-1', mustChangePassword: false }
     });
+    expect(result.user).not.toHaveProperty('passwordHash');
   });
 });

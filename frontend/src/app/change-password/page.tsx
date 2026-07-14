@@ -35,13 +35,14 @@ export default function ChangePasswordPage() {
       if (res.ok) {
         const data = await res.json();
         
-        if (data.access_token) {
+        if (typeof data.access_token === 'string' && data.access_token.length > 0) {
           localStorage.setItem('token', data.access_token);
+          toast.success("Hasło zostało zmienione pomyślnie!");
+          // The token is swapped, now we can force a full reload to let AuthContext initialize with the new token
+          window.location.href = '/fleet';
+        } else {
+          toast.error("Błąd uwierzytelnienia: brak prawidłowego tokena po zmianie hasła.");
         }
-        
-        toast.success("Hasło zostało zmienione pomyślnie!");
-        // The token is swapped, now we can force a full reload to let AuthContext initialize with the new token
-        window.location.href = '/fleet';
       } else {
         const errorData = await res.json().catch(() => ({}));
         toast.error(errorData.message || "Wystąpił błąd podczas zmiany hasła.");
