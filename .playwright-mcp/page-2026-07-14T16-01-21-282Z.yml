@@ -1,0 +1,88 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e83] [cursor=pointer]:
+    - button "Open issues overlay" [ref=e84]:
+      - generic [ref=e88]:
+        - generic [ref=e89]: "0"
+        - generic [ref=e90]: "1"
+      - generic [ref=e91]: Issue
+    - button "Collapse issues badge" [ref=e92]
+  - alert [ref=e3]
+  - complementary [ref=e4]:
+    - heading "AtlasHC" [level=1] [ref=e6]
+    - navigation [ref=e7]:
+      - link "Pulpit" [ref=e8] [cursor=pointer]:
+        - /url: /
+      - link "Zlecenia Naprawy" [ref=e14] [cursor=pointer]:
+        - /url: /orders
+      - link "Faktury" [ref=e17] [cursor=pointer]:
+        - /url: /invoices
+      - link "Klienci" [ref=e21] [cursor=pointer]:
+        - /url: /customers
+      - link "Pojazdy" [ref=e27] [cursor=pointer]:
+        - /url: /vehicles
+      - link "Moje Auta" [ref=e32] [cursor=pointer]:
+        - /url: /fleet
+      - link "Magazyn" [ref=e36] [cursor=pointer]:
+        - /url: /inventory
+      - link "Zespół" [ref=e95] [cursor=pointer]:
+        - /url: /team
+      - link "Ustawienia" [ref=e98] [cursor=pointer]:
+        - /url: /settings
+    - generic [ref=e41]: v0.1.0-alpha
+  - main [ref=e42]:
+    - generic [ref=e43]:
+      - generic [ref=e44]: Panel Zarządzania
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - generic [ref=e104]: Administrator
+          - generic [ref=e105]: OWNER
+        - generic [ref=e106]: A
+        - button [ref=e107]
+    - generic [ref=e147]:
+      - generic [ref=e148]:
+        - generic [ref=e149]:
+          - heading "Aktywne Zlecenia" [level=3] [ref=e150]
+          - generic [ref=e151]: "1"
+          - paragraph [ref=e152]: W trakcie realizacji
+        - generic [ref=e153]:
+          - heading "Pojazdy w Warsztacie" [level=3] [ref=e154]
+          - generic [ref=e155]: "1"
+          - paragraph [ref=e156]: Z przypisanymi zleceniami
+        - generic [ref=e157]:
+          - heading "Nowi Klienci" [level=3] [ref=e158]
+          - generic [ref=e159]: "2"
+          - paragraph [ref=e160]: Dodani w tym miesiącu
+        - generic [ref=e161]:
+          - heading "Miesięczny Przychód" [level=3] [ref=e162]
+          - generic [ref=e163]: 0 PLN
+          - paragraph [ref=e164]: Z zakończonych zleceń
+      - generic [ref=e165]:
+        - generic [ref=e166]:
+          - heading "Ostatnia Aktywność" [level=3] [ref=e167]
+          - link "Lamborghini Huracan STO Kamil Labudda NOWE about 21 hours ago" [ref=e169] [cursor=pointer]:
+            - /url: /orders/182916ca-3d81-46f0-89a6-9d18ca6e130a
+            - generic [ref=e170]:
+              - generic [ref=e171]: Lamborghini Huracan STO
+              - generic [ref=e172]: Kamil Labudda
+            - generic [ref=e173]:
+              - generic [ref=e174]: NOWE
+              - generic [ref=e175]: about 21 hours ago
+        - generic [ref=e176]:
+          - heading "Szybkie Akcje" [level=3] [ref=e177]
+          - generic [ref=e178]:
+            - link "Nowe Zlecenie Naprawy →" [ref=e179] [cursor=pointer]:
+              - /url: /orders
+              - generic [ref=e180]: Nowe Zlecenie Naprawy
+              - generic [ref=e181]: →
+            - link "Dodaj Klienta →" [ref=e182] [cursor=pointer]:
+              - /url: /customers
+              - generic [ref=e183]: Dodaj Klienta
+              - generic [ref=e184]: →
+            - link "Zarejestruj Pojazd →" [ref=e185] [cursor=pointer]:
+              - /url: /vehicles
+              - generic [ref=e186]: Zarejestruj Pojazd
+              - generic [ref=e187]: →
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e188]:
+        - generic [ref=e193]: Witaj, Administrator!

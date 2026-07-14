@@ -40,9 +40,11 @@ export class JwtAuthGuard implements CanActivate {
       (request as any).user = payload;
 
       if (payload.mustChangePassword) {
-        const isAuthMe = request.path === '/auth/me' && request.method === 'GET';
-        const isChangePassword = request.path === '/auth/change-password' && request.method === 'POST';
-        
+        const isAuthMe =
+          request.path === '/auth/me' && request.method === 'GET';
+        const isChangePassword =
+          request.path === '/auth/change-password' && request.method === 'POST';
+
         if (!isAuthMe && !isChangePassword) {
           throw new ForbiddenException('Musisz zmienić hasło.');
         }
