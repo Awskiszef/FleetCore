@@ -97,10 +97,10 @@ export class AuthController {
 
     const loginResponse = await this.authService.login(updatedUser);
 
-    return { 
+    return {
       message: 'Hasło zmienione pomyślnie',
       access_token: loginResponse.access_token,
-      user: loginResponse.user
+      user: loginResponse.user,
     };
   }
 

@@ -1,0 +1,59 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e83] [cursor=pointer]:
+    - button "Open issues overlay" [ref=e84]:
+      - generic [ref=e88]:
+        - generic [ref=e89]: "0"
+        - generic [ref=e90]: "1"
+      - generic [ref=e91]: Issue
+    - button "Collapse issues badge" [ref=e92]
+  - alert [ref=e3]
+  - complementary [ref=e4]:
+    - heading "AtlasHC" [level=1] [ref=e6]
+    - navigation [ref=e7]:
+      - link "Pulpit" [ref=e8] [cursor=pointer]:
+        - /url: /
+      - link "Zlecenia Naprawy" [ref=e14] [cursor=pointer]:
+        - /url: /orders
+      - link "Faktury" [ref=e17] [cursor=pointer]:
+        - /url: /invoices
+      - link "Klienci" [ref=e21] [cursor=pointer]:
+        - /url: /customers
+      - link "Pojazdy" [ref=e27] [cursor=pointer]:
+        - /url: /vehicles
+      - link "Moje Auta" [ref=e32] [cursor=pointer]:
+        - /url: /fleet
+      - link "Magazyn" [ref=e36] [cursor=pointer]:
+        - /url: /inventory
+      - link "Zespół" [ref=e95] [cursor=pointer]:
+        - /url: /team
+      - link "Ustawienia" [ref=e98] [cursor=pointer]:
+        - /url: /settings
+    - generic [ref=e41]: v0.1.0-alpha
+  - main [ref=e42]:
+    - generic [ref=e43]:
+      - generic [ref=e44]: Panel Zarządzania
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - generic [ref=e104]: Administrator
+          - generic [ref=e105]: OWNER
+        - generic [ref=e106]: A
+        - button [ref=e107]
+    - generic [ref=e109]:
+      - generic [ref=e110]:
+        - heading "AtlasHC Garage" [level=1] [ref=e115]
+        - paragraph [ref=e116]: Zaloguj się do panelu zarządzania
+      - generic [ref=e117]:
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - generic [ref=e120]: Adres E-mail
+            - textbox "admin@atlashc.pl" [ref=e125]
+          - generic [ref=e126]:
+            - generic [ref=e127]: Hasło
+            - textbox "••••••••" [ref=e132]
+          - button "Zaloguj się" [disabled]
+        - generic [ref=e133]: Lub zaloguj przez
+        - button "AWS IAM (SSO)" [ref=e138]
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e139]:
+        - generic [ref=e144]: Witaj, Administrator!
