@@ -7,7 +7,7 @@ import type { Response } from 'express';
 
 @Injectable()
 export class EstimatesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createEstimateDto: CreateEstimateDto, userId: string) {
     const { repairOrderId, validUntil, notes, items } = createEstimateDto;
@@ -104,18 +104,15 @@ export class EstimatesService {
             margin: [0, 0, 0, 10],
           },
           {
-            text: `Klient: ${
-              estimate.repairOrder.customer?.fullName || 'Brak danych'
-            }`,
+            text: `Klient: ${estimate.repairOrder.customer?.fullName || 'Brak danych'
+              }`,
           },
           {
-            text: `Pojazd: ${
-              estimate.repairOrder.vehicle
-                ? `${estimate.repairOrder.vehicle.make || ''} ${
-                    estimate.repairOrder.vehicle.model || ''
-                  }`
+            text: `Pojazd: ${estimate.repairOrder.vehicle
+                ? `${estimate.repairOrder.vehicle.make || ''} ${estimate.repairOrder.vehicle.model || ''
+                }`
                 : 'Brak danych'
-            }`,
+              }`,
             margin: [0, 0, 0, 15],
           },
           {
@@ -123,7 +120,13 @@ export class EstimatesService {
               headerRows: 1,
               widths: ['*', 45, 80, 45, 90],
               body: [
-                ['Nazwa', 'Ilość', 'Cena netto', 'VAT', 'Wartość brutto'],
+                [
+                  'Nazwa',
+                  'Ilość',
+                  'Cena netto',
+                  'VAT',
+                  'Wartość brutto',
+                ],
                 ...estimate.items.map((item) => [
                   item.name,
                   item.quantity.toString(),

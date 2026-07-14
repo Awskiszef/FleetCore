@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class IntakesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createIntakeDto: CreateIntakeDto, userId: string) {
     return this.prisma.vehicleIntake.create({
