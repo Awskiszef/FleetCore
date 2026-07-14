@@ -101,6 +101,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 bg-zinc-900/50 border-zinc-800 text-white focus-visible:ring-cyan-500"
                   placeholder="admin@atlashc.pl"
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -116,6 +117,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 bg-zinc-900/50 border-zinc-800 text-white focus-visible:ring-cyan-500"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
                 />
               </div>

@@ -87,7 +87,7 @@ export class AuthController {
 
     const newHash = await bcrypt.hash(newPassword, 10);
 
-    await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: user.id },
       data: {
         passwordHash: newHash,
@@ -95,7 +95,13 @@ export class AuthController {
       },
     });
 
-    return { message: 'Hasło zmienione pomyślnie' };
+    const loginResponse = await this.authService.login(updatedUser);
+
+    return { 
+      message: 'Hasło zmienione pomyślnie',
+      access_token: loginResponse.access_token,
+      user: loginResponse.user
+    };
   }
 
   @Public()

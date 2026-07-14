@@ -15,14 +15,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { apiClient } from "@/lib/api-client";
 
-interface Vehicle {
-  id: string;
-  make: string;
-  model: string;
-  licensePlate: string;
-  vin: string;
-  customer?: { id: string; fullName: string };
-}
+import { Vehicle } from "@/types/models";
 
 interface CustomerOption {
   id: string;

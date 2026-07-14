@@ -21,6 +21,7 @@ build/
 .DS_Store
 *.swp
 *.swo
+.agent/
 
 # Project Docs
 AI/

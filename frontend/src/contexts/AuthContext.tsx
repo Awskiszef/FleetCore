@@ -4,13 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import '../lib/api-interceptor'; // Import interceptor
 
-interface User {
-  id: string;
-  email: string;
-  fullName: string;
-  role: string;
-}
-
+import { User } from '@/types/models';
 interface AuthContextType {
   user: User | null;
   login: (token: string, user?: User) => void;
@@ -43,9 +37,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const userData = await res.json();
           setUser(userData);
-          if (pathname === '/login') {
+          if (userData.mustChangePassword) {
+            if (pathname !== '/change-password') router.push('/change-password');
+          } else if (pathname === '/login') {
+            router.push('/');
+          } else if (pathname === '/change-password') {
             router.push('/');
           }
+        } else if (res.status === 403) {
+          // Nie usuwamy tokenu w przypadku 403 (np. konieczność zmiany hasła na innym endpoincie)
+          if (pathname !== '/change-password') router.push('/change-password');
         } else {
           throw new Error('Invalid token');
         }
@@ -67,15 +68,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('token', token);
     if (userData) {
       setUser(userData);
-      router.push('/');
+      if (userData.mustChangePassword) {
+        router.push('/change-password');
+      } else {
+        router.push('/');
+      }
     } else {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
-          setUser(await res.json());
-          router.push('/');
+          const fetchedData = await res.json();
+          setUser(fetchedData);
+          if (fetchedData.mustChangePassword) {
+            router.push('/change-password');
+          } else {
+            router.push('/');
+          }
+        } else if (res.status === 403) {
+          router.push('/change-password');
         } else {
           router.push('/');
         }
@@ -96,7 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // If not logged in and not on a public page, don't render children (avoid flash)
-  if (!user && pathname !== '/login' && !pathname.startsWith('/auth/aws/callback')) {
+  const isPublicPage = pathname === '/login' || pathname.startsWith('/auth/aws/callback');
+  if (!user && !isPublicPage) {
+    return null;
+  }
+
+  // If user must change password but is not on change-password page, block render (will redirect)
+  if (user && user.mustChangePassword && pathname !== '/change-password') {
     return null;
   }
 

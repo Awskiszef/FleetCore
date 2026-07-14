@@ -12,26 +12,16 @@ import { Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-interface Vehicle {
-  id: string;
-  make: string;
-  model: string;
-  generation?: string;
-  productionYear?: number;
-  engine?: string;
-  horsepower?: number;
-  fuelType?: string;
-  mileage?: number;
-  licensePlate: string;
-  vin: string;
-  customer?: { id: string; fullName: string };
+import { Vehicle } from "@/types/models";
+
+export type VehicleDetail = Vehicle & {
   repairOrders?: any[];
-}
+};
 
 export default function VehicleProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -172,14 +162,14 @@ export default function VehicleProfilePage() {
   const openEditDialog = () => {
     if (vehicle) {
       setEditForm({
-        make: vehicle.make,
-        model: vehicle.model,
+        make: vehicle.make || "",
+        model: vehicle.model || "",
         productionYear: vehicle.productionYear?.toString() || "",
         engine: vehicle.engine || "",
         fuelType: vehicle.fuelType || "",
         mileage: vehicle.mileage?.toString() || "",
-        licensePlate: vehicle.licensePlate,
-        vin: vehicle.vin
+        licensePlate: vehicle.licensePlate || "",
+        vin: vehicle.vin || ""
       });
       setIsEditDialogOpen(true);
     }
@@ -278,8 +268,8 @@ export default function VehicleProfilePage() {
               {vehicle.make} {vehicle.model}
             </h1>
             <div className="flex items-center gap-3 mt-2 text-sm">
-              <span className="font-mono bg-zinc-900 px-2 py-0.5 rounded border border-zinc-700 text-zinc-200 shadow-inner font-bold tracking-wider">{vehicle.licensePlate}</span>
-              <span className="text-zinc-500 font-mono">VIN: {vehicle.vin}</span>
+              <span className="font-mono bg-zinc-900 px-2 py-0.5 rounded border border-zinc-700 text-zinc-200 shadow-inner font-bold tracking-wider">{vehicle.licensePlate || "Brak"}</span>
+              <span className="text-zinc-500 font-mono">VIN: {vehicle.vin || "Brak"}</span>
             </div>
           </div>
         </div>

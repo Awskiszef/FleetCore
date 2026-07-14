@@ -30,9 +30,10 @@ export class AuthService {
       role: user.role,
       mustChangePassword: user.mustChangePassword,
     };
+    const { passwordHash, ...userWithoutPassword } = user;
     return {
       access_token: this.jwtService.sign(payload),
-      user,
+      user: userWithoutPassword,
     };
   }
 }

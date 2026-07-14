@@ -1,139 +1,165 @@
-# AtlasHC Garage (FleetCore) - Pełna Dokumentacja
+# FleetCore
 
-**AtlasHC Garage** (wewnętrzna nazwa kodowa: FleetCore) to kompleksowa, w pełni autorska aplikacja webowa przeznaczona do zaawansowanego zarządzania nowoczesnym warsztatem samochodowym oraz flotą pojazdów. Została stworzona od zera z naciskiem na automatyzację przepływu pracy (workflow), minimalizację "papierologii" i zapewnienie niesamowitych, angażujących doświadczeń wizualnych (Glassmorphism, płynne animacje).
+System zarządzania warsztatem samochodowym i flotą. Aplikacja ułatwia zarządzanie pojazdami, tworzenie zleceń napraw, zarządzenie magazynem, generowanie kosztorysów oraz integrację z systemami fakturowymi. Pozwala na optymalizację procesu przyjmowania i wydawania pojazdów.
 
----
+## Najważniejsze funkcje
+- Użytkownicy i role (RBAC)
+- Klienci indywidualni i firmowi
+- Pojazdy
+- Zlecenia napraw
+- Mechanicy
+- Magazyn części
+- Dostawcy
+- Kosztorysy
+- Generowanie PDF
+- Historia napraw
+- Przyjęcia pojazdów
+- Załączniki
+- Ustawienia integracji
+- Audyt operacji
+- Wymuszona zmiana hasła dla nowo utworzonych kont
+- Opcjonalne logowanie AWS Cognito
 
-## 🚀 1. Główne Moduły i Cykl Życia Zlecenia
+## Stos technologiczny
+**Frontend**:
+- Next.js (16.2.9)
+- React (19.2.4)
+- TypeScript (5.x)
+- Tailwind CSS (4.x)
+- Komponenty UI (m.in. shadcn)
 
-Cała filozofia aplikacji opiera się na prostym i logicznym łańcuchu powiązań: **Klient ➔ Pojazd ➔ Zlecenie Naprawy**.
+**Backend**:
+- NestJS (11.0.1)
+- Prisma (5.22.0)
+- PostgreSQL
+- JWT & bcrypt
+- pdfmake
+- Jest
 
-### Klienci (CRM)
-Moduł stanowiący serce bazy kontaktów warsztatu. 
-- Możliwość rejestracji klientów indywidualnych oraz firmowych, w tym zagranicznych (z zagranicznymi prefiksami).
-- **Integracja z Ministerstwem Finansów (API MF):** Wpisanie samego numeru NIP pozwala zaciągnąć pełne dane polskiej firmy z oficjalnych rejestrów (Biała Lista), co skraca czas obsługi klienta.
-- Historia wizyt: Do klienta automatycznie przypinane są powiązane z nim pojazdy oraz pełna historia zleceń.
+## Architektura
+Projekt oparty jest na podziale klient-serwer.
+- **Frontend** zrealizowany w Next.js komunikuje się z serwerem poprzez silnie otypowane zapytania API REST.
+- **Backend REST API** zbudowany z użyciem NestJS odpowiada za całą logikę biznesową i zabezpieczenia.
+- **PostgreSQL** stanowi główną relacyjną bazę danych, a **Prisma ORM** pośredniczy i zabezpiecza transakcje bazy.
+- **System JWT** kontroluje chronione endpointy autoryzując zapytania i zamykając sesje bez wymiany wrażliwych danych.
+- **Integracje zewnętrzne** pozwalają obsługiwać płatności, faktury oraz dekodowanie VIN i usługi powiadomień.
 
-### Pojazdy (Flota)
-Wirtualny park maszynowy klientów.
-- Rejestracja z podziałem na kod kraju (np. PL, DE, CZ) i numer tablicy.
-- Posiada zaawansowany **dekoder VIN**. Warsztat wpisuje jedynie numer nadwozia samochodu, a aplikacja łącząc się z zewnętrzną komercyjną bazą (Vincario) z automatu uzupełnia markę, model, rok produkcji, rodzaj i pojemność silnika, a także rodzaj napędu.
-- Pojazd na stałe "przyklejany" jest do swojego właściciela.
-
-### Zlecenia Naprawy (Serce Systemu)
-Kompleksowy moduł operacyjny warsztatu. Gdy klient przyjeżdża z autem, tworzony jest bilet naprawczy (Zlecenie). Cykl wygląda następująco:
-
-1. **Utworzenie zlecenia (Status: NOWE)**
-   - Mechanik przyjmuje auto, przypisuje usterkę zgłoszoną przez klienta i szacowany koszt na start.
-2. **Diagnoza i Kosztorysowanie (Status: DIAGNOZA)**
-   - Mechanik weryfikuje usterkę. Może dodać notatki warsztatowe i ostateczną diagnozę.
-   - W tym momencie warsztat wyszukuje części w **Magazynie** i dodaje je wirtualnie do Zlecenia.
-3. **Naprawa (Status: W NAPRAWIE)**
-   - Auto wjeżdża na podnośnik. System zdejmuje dodane części ze stanów magazynowych na poczet tego zlecenia.
-   - Aplikacja **automatycznie przelicza koszt:** dolicza cenę zakupu wybranych części pomnożoną przez ustaloną stawkę "Marży" (%) oraz dolicza ustalony "Koszt Robocizny". Front-end pokazuje kalkulację klientowi i warsztatowi na żywo.
-4. **Rozliczenie i Odbiór (Status: ZAKOŃCZONE)**
-   - Status ten kończy naprawę, zatwierdza kalkulację do bazy danych i zamraża bilet. 
-
-### Załączniki i Media (Zdjęcia z naprawy)
-Do każdego zlecenia naprawy (lub do profilu klienta) można wgrywać nielimitowaną ilość zdjęć i plików PDF (np. zdjęcie rozrządu po demontażu jako dowód dla klienta, lub skan dowodu rejestracyjnego).
-Aplikacja samodzielnie sortuje wszystkie wgrywane na serwer pliki i układa je w bezpiecznych, ukrytych folderach nazwanych identyfikatorem (ID) konkretnego klienta. Zapobiega to bałaganowi w głównym folderze serwera.
-
-### Magazyn Części (Inventory)
-Wbudowany system ewidencji części warsztatowych.
-- Śledzenie numerów OEM, producentów i ilości sztuk leżących na półkach.
-- Przejrzysty interfejs ostrzegający o niskim stanie magazynowym.
-- Usunięcie części ze Zlecenia Naprawy u klienta automatycznie i bezpowrotnie „zwraca” ją na wirtualną półkę magazynową.
-
----
-
-## 🤖 2. Automatyzacje, Integracje Zewnętrzne i Konfiguracja
-
-System potrafi działać bezobsługowo w tle, zwalniając mechaników z konieczności chwytania za telefon. Całością można wygodnie sterować z zakładki **Ustawienia** w aplikacji.
-
-### Dynamiczne Ustawienia (Baza Danych)
-Aplikacja posiada elastyczny moduł ustawień (Klucz-Wartość) w bazie PostgreSQL. Z poziomu interfejsu przeglądarki użytkownik może samodzielnie wpisać wszystkie dane firmy i klucze API. System inteligentnie z nich korzysta (jeśli ich nie znajdzie, użyje wartości z `.env`).
-Zarządzane integracje z interfejsu to m.in.: inFakt, Vincario, Twilio oraz Resend.
-
-### Powiadomienia E-mail i SMS
-Dzięki modułowi `NotificationsService`, każda zmiana statusu w Zleceniu Naprawy powoduje wystrzelenie alertu.
-- Jeśli auto wchodzi na warsztat, system wysyła np. "Witaj Jan! Twoje zlecenie zmieniło status na: DIAGNOZA".
-- Integracje: **Twilio** (dla SMS) oraz **Resend** (dla E-maili).
-
-### Logowanie przez AWS Cognito (IAM SSO)
-System wykorzystuje bezpieczne środowisko chmurowe **AWS IAM Identity Center** z protokołem OAuth2 (Authorization Code Grant).
-- Zarządzanie uwierzytelnianiem i poświadczeniami jest oddelegowane do globalnego profilu pracownika w AWS.
-- System dynamicznie ładuje konfigurację i klucze logowania z bazy danych (do edycji w panelu *Ustawienia*).
-- Zastosowano agresywny firewall na froncie: logowanie użytkowników, których e-mail nie istnieje w wewnętrznej bazie kadr FleetCore skutkuje rzuceniem natychmiastowego pełnoekranowego wyjątku w postaci zaporowego czerwonego ekranu z brakiem możliwości ominięcia.
-
-### Fakturowanie (inFakt)
-Rozliczenia finansowe są w pełni powiązane z popularnym w Polsce systemem księgowym **inFakt**. 
-Z poziomu podglądu zakończonego zlecenia wystarczy kliknąć "Wystaw Fakturę". 
-- System dba o właściwy typ sprzedaży. Dla firm zagranicznych ustawiana jest odwrotna stawka podatkowa ("np") i typ "service".
-- Aplikacja **automatycznie tłumaczy** przedrostki usługi na fakturze na język kraju klienta (np. "Usługa naprawy pojazdu" dla PL, "Vehicle repair service" dla reszty, "Reparaturdienstleistung" dla DE, itd.).
-- Z automatu na fakturę wrzucana jest marka, model i numer rejestracyjny naprawianego pojazdu.
-
----
-
-## 🛠️ 3. Stos Technologiczny (Tech Stack)
-
-Aplikacja jest pełnoprawnym projektem typu Full-Stack. Wykorzystano tu topowe narzędzia Enterprise:
-
-* **Frontend:** 
-  - Zbudowany na platformie `Next.js 15` (TypeScript / React).
-  - Wykorzystano `TailwindCSS` oraz `Lucide-React` (ikony) wraz z komponentami "shadcn/ui" do wykreowania profesjonalnego stylu (glassmorphism).
-* **Backend:** 
-  - Restowe API oparte na mocarnym frameworku `NestJS`, pracujące pod kontrolą serwera NodeJS. 
-  - Silnie zmodularyzowana struktura oparta o Controller/Service, walidacja JWT, bcrypt.
-* **Baza Danych i Autoryzacja:** 
-  - Relacyjna baza `PostgreSQL`, zintegrowana przez ORM `Prisma`.
-  - Architektura oparta na Role-Based Access Control (RBAC): `ADMIN`, `OWNER`, `RECEPTIONIST`, `MECHANIC`.
-  - Zintegrowane przepływy uwierzytelniania przez **AWS Cognito / IAM** z wymianą kluczy z użyciem PKCE oraz weryfikacją JWKS (RS256).
-
-## 🔒 4. Bezpieczeństwo i Hardening
-Aplikacja wdrożyła ścisłe wytyczne `PHASE_1_SECURITY`:
-- **Autoryzacja:** Pełne uwierzytelnianie tokenów (JWT_SECRET z env), weryfikacja JWKS dla tokenów chmurowych AWS.
-- **RBAC:** Ścisła kontrola uprawnień za pomocą `@Roles()`, zabezpieczenie newralgicznych endpointów (np. fakturowanie, usuwanie danych, ustawienia).
-- **Bezpieczeństwo Załączników:** Pobieranie plików uwarunkowane tokenem JWT, brak dostępu z zewnątrz (usunięto ServeStaticModule), white-listing formatów, limity wagowe.
-- **Bezpieczeństwo Ustawień:** Szyfrowanie wrażliwych kluczy w bazie danych za pomocą AES-256-CBC. Automatyczne maskowanie w endpointach. Rejestracja zmian w systemie `AuditLog`.
-- **Ruch Sieciowy:** Wbudowany Rate Limiting (`@nestjs/throttler`), ograniczony `CORS` i restrykcyjna `ValidationPipe`.
-
----
-
-## ⚙️ 5. Instalacja i Konfiguracja Środowiska
-
-Aby uruchomić projekt, upewnij się, że posiadasz środowisko NodeJS oraz bazę PostgreSQL.
-
-### Zmienne Środowiskowe (Awaryjne klucze API)
-Klucze do API docelowo uzupełnia się w graficznym panelu **Ustawienia**, jednak plik ukryty `.env` w katalogu `/backend` definiuje dostęp do bazy oraz pełni funkcję awaryjną (tzw. fallback).
-
-```env
-# ==== BAZA DANYCH ====
-DATABASE_URL="postgresql://uzytkownik:haslo@localhost:5432/atlashc_garage?schema=public"
-JWT_SECRET="super-secret-jwt-key"
-
-# Wskazówka: Cała reszta kluczy (inFakt, Twilio, Vincario, Resend, AWS Cognito SSO) zapisywana 
-# jest w nowym elastycznym module ustawień bezpośrednio z interfejsu (zakładka Ustawienia). 
-# Możesz wpisać je także tutaj jako fallback, zgodnie z nazwami używanymi w serwisach.
+**Struktura katalogów:**
+```
+frontend/                 # Kod źródłowy klienta (Next.js)
+backend/                  # Kod źródłowy serwera (NestJS)
+backend/prisma/           # Definicje schematów bazy danych (schema.prisma)
+backend/src/              # Kontrolery i serwisy
+README.md                 # Dokumentacja projektu
 ```
 
-### Uruchomienie Serwisu (Tryb Deweloperski)
+## Wymagania
+- **Node.js** (v20 lub v24 dla zaplecza deweloperskiego)
+- **npm** (menedżer pakietów Node)
+- **PostgreSQL** (uruchomiony na localhost lub w chmurze)
+- **Git**
 
-W pierwszym oknie terminala startujemy "sercem":
+## Instalacja
+
 ```bash
+# 1. Pobierz repozytorium
+git clone https://github.com/Awskiszef/FleetCore.git
+cd FleetCore
+
+# 2. Zainstaluj pakiety
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+3. Skonfiguruj bazę **PostgreSQL** i stwórz plik `backend/.env` wg szablonu w `.env.example`.
+
+```bash
+# 4. Wygeneruj klienta Prisma
 cd backend
-npm install
+npx prisma generate
+
+# 5. Synchronizacja schematu z bazą 
+# (UWAGA: prisma db push nadaje się tylko dla środowisk deweloperskich. Przed użyciem na produkcji należy stosować kontrolowane migracje)
 npx prisma db push
-PORT=3001 npm run start:dev
+
+# 6. Utworzenie pierwszego administratora
+npm run bootstrap:admin
+
+# 7. Uruchomienie aplikacji
+# W jednym oknie terminala:
+cd backend && npm run start:dev
+
+# W drugim oknie terminala:
+cd frontend && npm run dev
 ```
 
-W drugim oknie terminala startujemy panelem:
+## Konfiguracja środowiska
+Zmienne środowiskowe należy zdefiniować w pliku `backend/.env` (lub ewentualnie na froncie w `frontend/.env.local`). Poniżej kluczowe przykłady:
+
+| Zmienna | Wymagana | Przeznaczenie | Przykładowa Wartość (Placeholder) |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Tak | Połączenie z bazą PostgreSQL | `postgresql://user:pass@localhost:5432/fleetcore` |
+| `JWT_SECRET` | Tak | Szyfrowanie tokenów JWT | `losowy-dlugi-ciag-znakow-jwt` |
+| `SETTINGS_ENCRYPTION_KEY` | Tak | Bezpieczne ustawienia systemowe | `32-bajtowy-wygenerowany-klucz-base64` |
+| `PORT` | Nie | Port uruchomienia serwera | `3001` |
+| `FRONTEND_URL` | Nie | URL aplikacji frontendowej | `http://localhost:3000` |
+| `CORS_ORIGINS` | Nie | Zezwolenie domenowe na zapytania API | `http://localhost:3000` |
+| `INFAKT_API_KEY` | Nie | Integracja z systemem faktur inFakt | `klucz-z-ustawien-konta-infakt` |
+| `VIN_API_KEY` | Nie | Klucz dla bramki dekodowania VIN | `klucz-z-bramki-vin` |
+| `VIN_API_SECRET` | Nie | Sekret dla bramki dekodowania VIN | `sekret-bramki-vin` |
+| `RESEND_API_KEY` | Nie | Klucz dostępu dla mailingów Resend | `klucz-resend` |
+| `TWILIO_ACCOUNT_SID` | Nie | Identyfikator konta Twilio (SMS) | `klucz-twilio-sid` |
+| `TWILIO_AUTH_TOKEN` | Nie | Token uwierzytelnienia Twilio | `token-twilio` |
+| `TWILIO_PHONE_NUMBER` | Nie | Telefon nadawcy dla usług SMS Twilio | `+48123456789` |
+
+## Pierwsze logowanie
+Podczas inicjalizacji wywołaj skrypt z poziomu katalogu backend:
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run bootstrap:admin
 ```
+Skrypt tworzy domyślnego użytkownika z rolą `OWNER` oraz ustaloną w bazie flagą `mustChangePassword=true`.
+Dzięki temu, podczas pierwszego logowania użytkownik zostanie natychmiast zmuszony do podania swojego własnego, stałego hasła, zanim system przepuści go do jakichkolwiek widoków w aplikacji. 
 
-Gotowe! Wejdź na `http://localhost:3000` i zarządzaj nowoczesnym warsztatem!
+## Dostępne skrypty
 
----
-*Dokumentacja utworzona dla FleetCore / AtlasHC Garage. Pełne prawa architektoniczne zastrzeżone.*
+**Backend (`package.json`)**
+| Skrypt | Działanie |
+| --- | --- |
+| `npm run start:dev` | Uruchamia serwer z odświeżaniem w tle |
+| `npm run build` | Kompiluje projekt produkcyjny (NestJS) |
+| `npm run test` | Uruchamia testy jednostkowe w (Jest) |
+| `npm run test:e2e` | Uruchamia testy automatyczne ścieżki e2e |
+| `npm run lint` | Uruchamia narzędzie diagnostyczne (Eslint) |
+| `npm run bootstrap:admin` | Tworzy główne konto właściciela projektu |
+
+**Frontend (`package.json`)**
+| Skrypt | Działanie |
+| --- | --- |
+| `npm run dev` | Uruchamia środowisko deweloperskie Next.js |
+| `npm run build` | Buduje produkcyjne pliki aplikacji |
+| `npm run start` | Serwuje zoptymalizowane strony |
+| `npm run lint` | Analiza poprawności składni i ostrzeżeń React |
+
+## Testy
+- **Testy jednostkowe backendu**: Modułowe testy (serwisy, kontrolery) realizowane z frameworkiem Jest w obrębie plików `.spec.ts` (np. pokrycie przepływów zmiany haseł dla modułu `auth`). (Obecne wydanie stabilne notuje zaliczenie na poziomie 24/24).
+- **Testy E2E**: Automatyczne przepływy akcji na żywym interfejsie realizowane z zewnątrz lub przy pomocy wbudowanych komend testowych e2e środowiska backendowego.
+- **Build frontendu**: Silna i ostra kompilacja w Typescript gwarantuje weryfikację błędów na wczesnym etapie podczas budowania paczki poleceniem build.
+- **Testy autoryzacji**: Kod pokrywa i gwarantuje poprawną wymianę wygasających sesji oraz zachowanie stabilności podczas zmiany haseł na koncie.
+
+## Bezpieczeństwo
+- Wszystkie zmienne dostępowe, klucze i hasła konfiguracyjne instalacji (tzw. sekrety) muszą znajdować się wyłącznie w pliku powiązanym dla zmiennych, np. `backend/.env`.
+- Żaden z plików z rozszerzeniem `.env` nie może zostać opublikowany z kodem. System `.gitignore` dba o ich omijanie.
+- Hasła logowania do bazy szyfrowane są biblioteką bcrypt i `passwordHash` nigdy nie wycieka oraz nie jest zawarty w odpowiedzi API.
+- Wymagany `SETTINGS_ENCRYPTION_KEY` musi stanowić wygenerowany losowo zbiór uchodzący 32 bitowym wektorom IV by skutecznie kodować logikę serwisu wewnętrznego. 
+- Aplikacja w środowisku produkcyjnym wymaga uruchomienia na serwerze i protokołu certyfikowanego za pośrednictwem HTTPS.
+- Konta integracyjne opierają się na unikalnych kluczach dostarczonych od zweryfikowanych operatorów płatności oraz usług, dając tym samym autoryzację.
+- Dostęp do bazy danych powinien zostać zredukowany przez zapory sieciowe. 
+
+## Znane ograniczenia
+- System i repozytorium charakteryzuje dług historyczny na poziomie ostrzeżeń lint zarówno u strony frontendu, jak i backendu. Wymagają one dedykowanego wdrożenia naprawczego w kolejnym sprincie optymalizacyjnym.
+- Funkcjonowanie bramek dekodujących VIN lub pobieranie danych do systemu fakturowania nie ma zaszytego serwera mock w samej aplikacji - wymaga połączeń do odpowiednich kont dostawców.
+- Integracje oraz poprawne wdrożenie całości serwerowych narzędzi wiąże się ze stworzeniem środowiska wejściowego Nginx lub środowiska hostingu (platform as a service) oraz nie uwzględnia standardowych konfiguracji z pudełka - wszystko zależy od devopsów.
+
+## Status projektu
+**Project status: Stable / Maintenance**
+Baza, szkielet, a także główne moduły projektu zostały w pełni zaprojektowane i wdrożone. Krytyczny przepływ autoryzacji w tym bezpieczeństwo uwierzytelniania i autoryzacji na podstawie `mustChangePassword` zostało kompleksowo zlikwidowane na obustronnym węźle. Projekt uważa się za gotowy na produkcję. Od tego momentu repozytorium znajduje się na etapie wczesnego utrzymania - ewentualne mniejsze lub poboczne usterki oraz dodawanie nieujętych funkcjonalności musi zostać wdrażane jako proces śledzony w oparciu o rewizje z zamykanych zgłoszeń jako ustrukturyzowane ulepszenia (Pull Request).

@@ -15,18 +15,14 @@ import { PaginationControls } from "@/components/ui/pagination-controls";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Define TypeScript interfaces based on Prisma schema
-interface Customer {
-  id: string;
-  fullName: string;
-  companyName?: string;
-  email: string;
-  phone: string;
+import { Customer } from "@/types/models";
+
+export type CustomerWithVehicles = Customer & {
   vehicles?: any[];
-}
+};
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerWithVehicles[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -59,7 +55,7 @@ export default function CustomersPage() {
       const page = Number(searchParams.get("page")) || 1;
       const search = searchParams.get("search") || "";
       const result = await apiClient.getCustomers({ page, limit: 20, search });
-      setCustomers(result.data as Customer[]);
+      setCustomers(result.data as CustomerWithVehicles[]);
       setPagination({ page: result.page, limit: result.limit, totalPages: result.totalPages });
     } catch (error) {
       toast.error("Nie udało się pobrać bazy klientów.");

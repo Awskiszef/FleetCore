@@ -13,31 +13,16 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { downloadAuthenticatedFile } from "@/lib/download-auth-file";
 
-interface RepairOrder {
-  id: string;
-  status: string;
-  reportedIssue: string;
-  diagnosis?: string;
-  mechanicNotes?: string;
-  estimatedCost?: number;
-  finalCost?: number;
-  laborCost?: number;
-  marginPercentage?: number;
-  createdAt: string;
-  assignedMechanicId?: string;
-  assignedMechanic?: { id: string; fullName: string };
-  customer?: { id: string; fullName: string; phone?: string; companyName?: string; nip?: string };
-  vehicle?: { id: string; make: string; model: string; licensePlate: string; vin: string };
-  invoiceId?: string;
-  invoiceUrl?: string;
+import { RepairOrder } from "@/types/models";
+
+export type RepairOrderDetail = RepairOrder & {
   parts?: Array<{
     id: string;
     quantity: number;
     priceAtUsage: number;
     part: { id: string; name: string; oemNumber?: string };
   }>;
-}
-
+};
 export default function RepairOrderProfilePage() {
   const { user } = useAuth();
   const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
@@ -45,7 +30,7 @@ export default function RepairOrderProfilePage() {
 
   const params = useParams();
   const router = useRouter();
-  const [order, setOrder] = useState<RepairOrder | null>(null);
+  const [order, setOrder] = useState<RepairOrderDetail | null>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
