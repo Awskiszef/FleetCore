@@ -33,17 +33,15 @@ export default function ChangePasswordPage() {
       });
 
       if (res.ok) {
-        toast.success("Hasło zostało zmienione pomyślnie!");
-        // Refresh token / user info
-        const meRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/me`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (meRes.ok) {
-          // Note: AuthContext checkAuth will automatically pick this up on navigation, but we can force redirect
-          window.location.href = '/';
-        } else {
-          router.push('/');
+        const data = await res.json();
+        
+        if (data.access_token) {
+          localStorage.setItem('token', data.access_token);
         }
+        
+        toast.success("Hasło zostało zmienione pomyślnie!");
+        // The token is swapped, now we can force a full reload to let AuthContext initialize with the new token
+        window.location.href = '/fleet';
       } else {
         const errorData = await res.json().catch(() => ({}));
         toast.error(errorData.message || "Wystąpił błąd podczas zmiany hasła.");

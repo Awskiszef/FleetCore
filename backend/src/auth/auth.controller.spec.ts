@@ -188,4 +188,36 @@ describe('AuthController', () => {
       UnauthorizedException,
     );
   });
+
+  it('8. Zmiana hasła zwraca nowy token i usuwa flagę mustChangePassword', async () => {
+    const mockUser = { id: 'user-1', passwordHash: 'hash', mustChangePassword: true };
+    usersService.findById = jest.fn().mockResolvedValue(mockUser);
+    const prismaUpdateMock = jest.fn().mockResolvedValue({ ...mockUser, mustChangePassword: false });
+    const prismaService = { user: { update: prismaUpdateMock } };
+    
+    // override prisma in controller for this test
+    (controller as any).prisma = prismaService;
+    
+    const bcrypt = require('bcrypt');
+    jest.spyOn(bcrypt, 'compare').mockImplementation(async () => true);
+    jest.spyOn(bcrypt, 'hash').mockImplementation(async () => 'newHash');
+    
+    authService.login.mockResolvedValue({ access_token: 'new-token', user: { id: 'user-1', mustChangePassword: false } });
+
+    const result = await controller.changePassword(
+      { user: { sub: 'user-1' } } as any,
+      { oldPassword: 'old', newPassword: 'new' }
+    );
+
+    expect(prismaUpdateMock).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { passwordHash: 'newHash', mustChangePassword: false },
+    });
+    expect(authService.login).toHaveBeenCalledWith({ ...mockUser, mustChangePassword: false });
+    expect(result).toEqual({
+      message: 'Hasło zmienione pomyślnie',
+      access_token: 'new-token',
+      user: { id: 'user-1', mustChangePassword: false }
+    });
+  });
 });
